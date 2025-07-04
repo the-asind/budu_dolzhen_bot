@@ -1,0 +1,12 @@
+services:
+  bot:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    command: python main.py
+
+volumes:
+  data: 

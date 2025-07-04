@@ -1,0 +1,10 @@
+# Test suite
+pytest
+pytest-asyncio
+
+# Linter & formatter
+ruff
+black
+
+# Coverage analysis
+coverage[toml] 

@@ -1,0 +1,9 @@
+{
+    "start_welcome": "Hello! I am 'Budu Dolzhen' bot, here to help you track debts among friends.\n\nTo record a debt, just send a message like this:\n`@friend 500 for a movie`\n\nI will notify your friend and keep track of the repayment.\nTo see all commands, type /help.",
+    "help_message": "Bot Help:\n\n**Recording a Debt:**\nJust send a message in the format:\n`@username1 @username2... amount comment`\nExample: `@friend 500 for dinner`\n\n**Paying a Debt:**\nUse the /pay command (to be implemented)\n\n**Settings:**\nUse the /settings command (to be implemented)",
+    "error_in_message": "Errors while processing your message:\n{errors}",
+    "debts_registered": "Debts have been successfully registered and are awaiting confirmation.",
+    "payment_registered": "Your payment has been registered and is awaiting confirmation from the creditor.",
+    "invalid_pay_command_format": "Invalid format. Use: `{command}`",
+    "debt_notification": "Hi! {creditor_name} says you owe them {amount} RUB for '{description}'.\nPlease confirm this debt."
+} 
