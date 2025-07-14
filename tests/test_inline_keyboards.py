@@ -4,7 +4,13 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from aiogram.types import (
-    InlineQuery, InlineQueryResultArticle, CallbackQuery, Message, User, Chat
+    InlineQuery,
+    InlineQueryResultArticle,
+    CallbackQuery,
+    Message,
+    User,
+    Chat,
+    InlineKeyboardMarkup,
 )
 
 from bot.handlers.inline_handlers import handle_inline_query, handle_debt_callback
@@ -47,12 +53,12 @@ class TestInlineKeyboardGeneration:
         """Test that inline queries generate proper keyboards."""
         with patch.object(DebtParser, 'parse') as mock_parse, \
              patch.object(DebtManager, 'process_message') as mock_process, \
-             patch('bot.keyboards.debt_kbs.get_debt_confirmation_kb') as mock_kb:
+             patch('bot.handlers.inline_handlers.get_debt_confirmation_kb') as mock_kb:
             
             # Setup mocks with proper async handling
             mock_parse.return_value = {"debtor": MagicMock(amount=10000, combined_comment="coffee")}
             mock_process.return_value = [mock_debt]
-            mock_kb.return_value = MagicMock()
+            mock_kb.return_value = InlineKeyboardMarkup(inline_keyboard=[])
             
             await handle_inline_query(mock_inline_query)
             
@@ -74,11 +80,11 @@ class TestInlineKeyboardGeneration:
         
         with patch.object(DebtParser, 'parse') as mock_parse, \
              patch.object(DebtManager, 'process_message') as mock_process, \
-             patch('bot.keyboards.debt_kbs.get_debt_confirmation_kb') as mock_kb:
+             patch('bot.handlers.inline_handlers.get_debt_confirmation_kb') as mock_kb:
             
             mock_parse.return_value = {"debtor": MagicMock(amount=10000, combined_comment="coffee")}
             mock_process.return_value = [mock_debt]
-            mock_kb.return_value = MagicMock()
+            mock_kb.return_value = InlineKeyboardMarkup(inline_keyboard=[])
             
             await handle_inline_query(inline_query)
             
@@ -103,7 +109,7 @@ class TestInlineKeyboardGeneration:
         args = inline_query.answer.call_args[0]
         assert len(args[0]) == 1
         assert args[0][0].id == "help"
-        assert "Format:" in args[0][0].description
+        assert "inline_query_format_help" in args[0][0].description
 
     @pytest.mark.asyncio
     async def test_multiple_debts_generate_multiple_keyboards(self, model_user):
@@ -121,14 +127,14 @@ class TestInlineKeyboardGeneration:
         
         with patch.object(DebtParser, 'parse') as mock_parse, \
              patch.object(DebtManager, 'process_message') as mock_process, \
-             patch('bot.keyboards.debt_kbs.get_debt_confirmation_kb') as mock_kb:
+             patch('bot.handlers.inline_handlers.get_debt_confirmation_kb') as mock_kb:
             
             mock_parse.return_value = {
                 "debtor1": MagicMock(amount=10000, combined_comment="coffee"),
                 "debtor2": MagicMock(amount=20000, combined_comment="lunch")
             }
             mock_process.return_value = [debt1, debt2]
-            mock_kb.return_value = MagicMock()
+            mock_kb.return_value = InlineKeyboardMarkup(inline_keyboard=[])
             
             await handle_inline_query(inline_query)
             
@@ -155,7 +161,7 @@ class TestCallbackQueryHandling:
         
         mock_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="active")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 1}
@@ -183,7 +189,7 @@ class TestCallbackQueryHandling:
         
         mock_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="rejected")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtRepository, 'update_status') as mock_update:
             
             mock_decode.return_value = {"action": "debt_decline", "debt_id": 1}
@@ -209,7 +215,7 @@ class TestCallbackQueryHandling:
             data="invalid_data"
         )
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode:
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode:
             mock_decode.return_value = {}
             
             await handle_debt_callback(callback_query)
@@ -230,7 +236,7 @@ class TestCallbackQueryHandling:
             data="debt_agree:1"
         )
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 1}
@@ -261,7 +267,7 @@ class TestMessageEditingLogic:
         
         mock_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="active")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 1}
@@ -287,7 +293,7 @@ class TestMessageEditingLogic:
         
         mock_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="rejected")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtRepository, 'update_status') as mock_update:
             
             mock_decode.return_value = {"action": "debt_decline", "debt_id": 1}
@@ -313,7 +319,7 @@ class TestMessageEditingLogic:
         
         mock_debt = Debt(debt_id=42, creditor_id=123, debtor_id=456, amount=15000, description="lunch", status="active")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 42}
@@ -345,11 +351,11 @@ class TestButtonInteractionWorkflows:
         
         with patch.object(DebtParser, 'parse') as mock_parse, \
              patch.object(DebtManager, 'process_message') as mock_process, \
-             patch('bot.keyboards.debt_kbs.get_debt_confirmation_kb') as mock_kb:
+             patch('bot.handlers.inline_handlers.get_debt_confirmation_kb') as mock_kb:
             
             mock_parse.return_value = {"debtor": MagicMock(amount=10000, combined_comment="coffee")}
             mock_process.return_value = [mock_debt]
-            mock_kb.return_value = MagicMock()
+            mock_kb.return_value = InlineKeyboardMarkup(inline_keyboard=[])
             
             await handle_inline_query(inline_query)
             
@@ -374,7 +380,7 @@ class TestButtonInteractionWorkflows:
         
         confirmed_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="active")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 1}
@@ -408,7 +414,7 @@ class TestButtonInteractionWorkflows:
         
         declined_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="rejected")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtRepository, 'update_status') as mock_update:
             
             mock_decode.return_value = {"action": "debt_decline", "debt_id": 1}
@@ -493,7 +499,7 @@ class TestErrorScenarios:
             message=message
         )
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 1}
@@ -523,7 +529,7 @@ class TestErrorScenarios:
             message=message
         )
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 999}
@@ -559,7 +565,7 @@ class TestCleanChatInterface:
         
         mock_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="active")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 1}
@@ -593,7 +599,7 @@ class TestCleanChatInterface:
         
         mock_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="active")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 1}
@@ -629,7 +635,7 @@ class TestIntegrationWithDebtManager:
         
         mock_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="active")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 1}
@@ -661,7 +667,7 @@ class TestIntegrationWithDebtManager:
         
         mock_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="rejected")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtRepository, 'update_status') as mock_update:
             
             mock_decode.return_value = {"action": "debt_decline", "debt_id": 1}
@@ -690,11 +696,11 @@ class TestIntegrationWithDebtManager:
         
         with patch.object(DebtParser, 'parse') as mock_parse, \
              patch.object(DebtManager, 'process_message') as mock_process, \
-             patch('bot.keyboards.debt_kbs.get_debt_confirmation_kb') as mock_kb:
+             patch('bot.handlers.inline_handlers.get_debt_confirmation_kb') as mock_kb:
             
             mock_parse.return_value = {"debtor": MagicMock(amount=10000, combined_comment="coffee")}
             mock_process.return_value = [mock_debt]
-            mock_kb.return_value = MagicMock()
+            mock_kb.return_value = InlineKeyboardMarkup(inline_keyboard=[])
             
             await handle_inline_query(inline_query)
             
@@ -719,7 +725,7 @@ class TestIntegrationWithDebtManager:
         
         confirmed_debt = Debt(debt_id=1, creditor_id=123, debtor_id=456, amount=10000, description="coffee", status="active")
         
-        with patch('bot.keyboards.debt_kbs.decode_callback_data') as mock_decode, \
+        with patch('bot.handlers.inline_handlers.decode_callback_data') as mock_decode, \
              patch.object(DebtManager, 'confirm_debt') as mock_confirm:
             
             mock_decode.return_value = {"action": "debt_agree", "debt_id": 1}

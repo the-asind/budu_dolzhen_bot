@@ -125,10 +125,10 @@ def stub_apscheduler():
             self.jobs = {}
             self._next_id = 1
 
-        async def start(self):
+        def start(self):
             self.state = 1
 
-        async def shutdown(self, wait=True):
+        def shutdown(self, wait=True):
             self.state = 0
 
         def add_listener(self, listener):
@@ -167,6 +167,10 @@ def stub_apscheduler():
 
         def resume(self, job_id=None):
             self.state = 1
+
+        @property
+        def running(self):
+            return self.state == 1
 
         def get_jobs(self):
             return list(self.jobs.values())
@@ -207,10 +211,25 @@ def stub_apscheduler():
     assert async_mod.AsyncIOScheduler is DummyScheduler
     assert sqlalchemy_mod.SQLAlchemyJobStore is DummyJobStore
 
+    # Patch already-imported scheduler_manager if present
+    sm_module = sys.modules.get("bot.scheduler.scheduler_manager")
+    if sm_module is not None:
+        if hasattr(sm_module, "AsyncIOScheduler"):
+            sm_module.AsyncIOScheduler = DummyScheduler  # type: ignore
+        if hasattr(sm_module, "SQLAlchemyJobStore"):
+            sm_module.SQLAlchemyJobStore = DummyJobStore  # type: ignore
+
     yield
 
     async_mod.AsyncIOScheduler = OriginalScheduler
     sqlalchemy_mod.SQLAlchemyJobStore = OriginalJobStore
+    # Restore scheduler_manager module if it was patched
+    sm_module = sys.modules.get("bot.scheduler.scheduler_manager")
+    if sm_module is not None:
+        if hasattr(sm_module, "AsyncIOScheduler"):
+            sm_module.AsyncIOScheduler = OriginalScheduler  # type: ignore
+        if hasattr(sm_module, "SQLAlchemyJobStore"):
+            sm_module.SQLAlchemyJobStore = OriginalJobStore  # type: ignore
 
 
 @pytest.fixture(scope="session", autouse=True)
