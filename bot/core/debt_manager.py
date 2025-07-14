@@ -1,28 +1,20 @@
-"""Debt management business logic (MVP, TDD slice).
-
-Implements a minimal subset of Issue 1 from the Project Research Plan:
-1. Parses the author's message with `DebtParser`.
-2. Creates one pending `Debt` per debtor via in-memory `DebtRepository`.
-3. Auto-creates `User` entries when they do not yet exist.
-
-This version purposefully omits confirmations, trust logic, mutual netting,
-etc. to allow incremental TDD. Those features will be added in subsequent
-iterations alongside dedicated tests.
-"""
+"""Debt management business logic (MVP, TDD slice)."""
 
 from __future__ import annotations
 
 from typing import List
 from datetime import timezone, datetime
 
+from bot.db.models import Debt, DebtStatus
 from bot.db.repositories import (
-    Debt,
     DebtRepository,
-    UserRepository,
-    DebtStatus,
+    UserRepository
 )
 
 from .debt_parser import DebtParser
+
+STATUS_ACTIVE = "active"
+STATUS_PENDING = "pending"
 
 
 class DebtManager:  # pylint: disable=too-few-public-methods
@@ -32,7 +24,6 @@ class DebtManager:  # pylint: disable=too-few-public-methods
     async def process_message(message: str, *, author_username: str) -> List[Debt]:
         """Parse *message*, create `Debt` records and return them."""
 
-        # Ensure creditor exists
         author = await UserRepository.get_by_username(author_username)
         if author is None:
             author = await UserRepository.add(author_username)
@@ -45,7 +36,11 @@ class DebtManager:  # pylint: disable=too-few-public-methods
             if debtor is None:
                 debtor = await UserRepository.add(debtor_username)
 
-            status = DebtStatus.ACTIVE if await UserRepository.trusts(debtor.user_id, author_username) else DebtStatus.PENDING
+            status = (
+                STATUS_ACTIVE
+                if await UserRepository.trusts(debtor.user_id, author_username)
+                else STATUS_PENDING
+            )
 
             debt = await DebtRepository.add(
                 creditor_id=author.user_id,
@@ -54,17 +49,13 @@ class DebtManager:  # pylint: disable=too-few-public-methods
                 description=pd.combined_comment,
             )
 
-            # override status if auto-accepted
-            if status == DebtStatus.ACTIVE:
-                debt.status = DebtStatus.ACTIVE
+            if status == STATUS_ACTIVE:
+                debt = await DebtRepository.update_status(debt.debt_id, STATUS_ACTIVE)
 
             created.append(debt)
 
         return created
 
-    # ---------------------------------------------------------------------
-    # Confirmation
-    # ---------------------------------------------------------------------
 
     @staticmethod
     async def confirm_debt(debt_id: int, *, debtor_username: str) -> Debt:
@@ -78,5 +69,5 @@ class DebtManager:  # pylint: disable=too-few-public-methods
         if debtor is None or debtor.user_id != debt.debtor_id:
             raise ValueError("Only debtor can confirm debt")
 
-        debt = await DebtRepository.update_status(debt_id, DebtStatus.ACTIVE)
-        return debt 
+        debt = await DebtRepository.update_status(debt_id, STATUS_ACTIVE)
+        return debt

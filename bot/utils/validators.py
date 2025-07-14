@@ -71,4 +71,8 @@ def validate_positive_int(value: int) -> int:
 def validate_amount_expression(expr: str) -> None:
     """Validate that arithmetic expression *expr* contains only safe characters."""
     if not EXPR_ALLOWED_PATTERN.match(expr):
-        raise ValueError("Amount expression contains unsafe characters.") 
+        raise ValueError("Amount expression contains unsafe characters.")
+
+def validate_contact_info(contact: str) -> bool:  # noqa: D401
+    """Alias for *is_valid_contact_info* kept for legacy unit-tests."""
+    return is_valid_contact_info(contact) 

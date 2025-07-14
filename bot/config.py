@@ -45,14 +45,13 @@ class AppSettings(BaseSettings):
     debug: bool = Field(False, description="Enable debug mode for development")
     log_level: str = Field("INFO", description="Logging level")
 
-    bot: BotSettings = BotSettings()
-    db: DatabaseSettings = DatabaseSettings()
-    scheduler: SchedulerSettings = SchedulerSettings()
-
+    bot: BotSettings = Field(default_factory=BotSettings)
+    db: DatabaseSettings = Field(default_factory=DatabaseSettings)
+    scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
     @property
     def log_level_value(self) -> int:
         """Return the numeric value of the log level."""
-        return logging.getLevelName(self.log_level.upper())
+        return getattr(logging, self.log_level.upper())
 
 
 @lru_cache
@@ -70,4 +69,7 @@ def get_settings() -> AppSettings:
             db=DatabaseSettings(path=":memory:"),
             scheduler=SchedulerSettings(timezone="UTC")
         )
-    return AppSettings() 
+    return AppSettings(
+        debug=False,
+        log_level="INFO"
+    )

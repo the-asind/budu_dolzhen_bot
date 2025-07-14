@@ -15,7 +15,7 @@ payment_manager = PaymentManager()
 PAY_COMMAND_RE = re.compile(r"/pay\s+(\d+)\s+([\d.,]+)")
 
 
-@router.message(Command(commands=["pay"]))
+@router.message(Command("pay"))
 async def handle_pay_command(message: Message, _: Callable):
     """
     Handler for the /pay command to record a payment against a debt.
@@ -34,7 +34,7 @@ async def handle_pay_command(message: Message, _: Callable):
     debt_id = int(debt_id_str)
     amount_in_cents = int(Decimal(amount_str.replace(",", ".")) * 100)
 
-    # In a real app, we'd need more logic here:
+    # TODO:In a real app, we'd need more logic here:
     # 1. Verify that the user sending the command is the debtor of this debt.
     # 2. Handle partial or full payments.
     # 3. Trigger confirmation workflow with the creditor.

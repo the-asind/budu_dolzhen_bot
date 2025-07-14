@@ -26,7 +26,6 @@ async def main():
     """The main function that starts the bot."""
     settings = get_settings()
 
-    # Configure logging
     logging.basicConfig(
         level=settings.log_level_value,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -34,10 +33,8 @@ async def main():
     )
     logger = logging.getLogger(__name__)
 
-    # Initialize database
     await db.connect()
 
-    # Initialize Bot and Dispatcher
     bot = Bot(
         token=settings.bot.token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -45,25 +42,20 @@ async def main():
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
-    # Register middlewares
     dp.update.outer_middleware(LoggingMiddleware())
     dp.update.outer_middleware(UserMiddleware())
     dp.update.outer_middleware(I18nMiddleware())
 
-    # Create notification service
     notifier = NotificationService(bot)
 
-    # Pass dependencies to routers
     dp["notification_service"] = notifier
 
-    # Register routers
     dp.include_router(common_router)
     dp.include_router(debt_router)
     dp.include_router(payment_router)
     dp.include_router(profile_router)
     dp.include_router(inline_router)
 
-    # Start the scheduler
     scheduler_manager.start()
 
     logger.info("Starting bot...")

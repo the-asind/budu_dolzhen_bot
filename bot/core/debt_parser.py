@@ -1,9 +1,6 @@
-"""A new, robust implementation of the Debt Parser."""
-
 from __future__ import annotations
 
 import ast
-import operator as op
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List
@@ -44,7 +41,6 @@ class DebtParser:
         aggregated_debts: Dict[str, ParsedDebt] = {}
 
         if len(lines) == 1:
-            # Propagate error as-is for single-line input to keep message clean for tests
             DebtParser._parse_line(lines[0], author_username, aggregated_debts)
             return aggregated_debts
 
@@ -70,7 +66,6 @@ class DebtParser:
         if not tokens:
             raise DebtParseError("Line does not match expected pattern.")
 
-        # 1. Collect names tokens until first non-name token encountered.
         name_tokens: list[str] = []
         i = 0
         for tok in tokens:
@@ -83,7 +78,6 @@ class DebtParser:
         if not name_tokens:
             raise DebtParseError("No user mentions found.")
 
-        # validate usernames & duplicates
         mentions: list[str] = []
         seen: set[str] = set()
         has_self = False
@@ -103,7 +97,6 @@ class DebtParser:
             seen.add(username)
             mentions.append(username)
 
-        # 2. Extract amount expression tokens – must be at least one token
         if i >= len(tokens):
             raise DebtParseError("Amount not found.")
 
@@ -119,7 +112,6 @@ class DebtParser:
         if not amount_tokens:
             raise DebtParseError("Amount not found.")
 
-        # Join amount tokens stripping spaces inside later
         amount_expr_raw = "".join(amount_tokens)
 
         try:
@@ -135,7 +127,6 @@ class DebtParser:
         # Convert to int with half-up rounding for fractional results
         share_int = int(amount_value_float + 0.5)
 
-        # 3. Comment – remainder of tokens joined with space
         comment = " ".join(tokens[i:]).strip()
 
         # No debtors? (all mentions are author)

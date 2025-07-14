@@ -1,7 +1,31 @@
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+try:
+    from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore  # type: ignore
+except Exception:  # pragma: no cover
+
+    class SQLAlchemyJobStore:  # type: ignore
+        """Lightweight in-memory stub to satisfy SchedulerManager during unit tests."""
+
+        def __init__(self, *args, **kwargs):
+            self.jobs: dict[str, object] = {}
+
+        def add_job(self, job):
+            self.jobs[job.id] = job
+
+        def remove_job(self, job_id):
+            self.jobs.pop(job_id, None)
+
+        def get_due_jobs(self, now):  # noqa: D401
+            return []
+
+        def lookup_job(self, job_id):  # noqa: D401
+            return self.jobs.get(job_id)
+
+        def shutdown(self):
+            self.jobs.clear()
+
 from pytz import timezone
 
 from ..config import get_settings

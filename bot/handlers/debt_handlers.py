@@ -18,21 +18,47 @@ async def handle_debt_message(
 ):
     """
     Handler for messages that appear to be debt registrations.
+    Context-aware behavior for private and group chats.
     """
     if not message.text or not message.from_user:
         return
 
-    # In a real app, you might inject this via a middleware or a proper DI container
-    debt_manager = DebtManager(DebtParser(), notification_service)
+    chat_type = message.chat.type
 
-    result = await debt_manager.process_debt_message(
-        message_text=message.text,
-        creditor_tg_id=message.from_user.id,
-        _=_,
+    if chat_type in ("group", "supergroup"):
+        try:
+            member = await bot.get_chat_member(message.chat.id, message.from_user.id)
+            if member.status not in ("administrator", "creator"):
+                await message.reply(_("debt_group_only_admins"))
+                return
+        except Exception:
+            await message.reply(_("debt_group_admin_check_failed"))
+            return
+
+        try:
+            await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+        except Exception:
+            pass
+
+        try:
+            await bot.send_message(
+                chat_id=message.from_user.id,
+                text=_("debt_group_dm_instruction"),
+            )
+        except Exception:
+            await message.reply(_("debt_group_start_bot_first"))
+        return
+    
+    text = message.text.strip()
+
+    debt_manager = DebtManager()
+
+    result = await debt_manager.process_message(
+        message=text,
+        author_username=message.from_user.username or "",
     )
 
-    if result.errors:
-        errors = "\n".join(result.errors)
-        await message.reply(_("error_in_message", errors=errors))
+    if result:
+        await message.reply(_("debts_registered"))
     else:
-        await message.reply(_("debts_registered")) 
+        await message.reply(_("error_in_message"))
