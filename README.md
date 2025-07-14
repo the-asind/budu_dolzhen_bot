@@ -98,3 +98,5 @@ The bot is built using `aiogram` and follows a modular structure to separate con
 - `docs/`: Contains the database schema (`schema.sql`).
 - `tests/`: Contains tests for the application (currently a work in progress).
 - `Dockerfile` & `docker-compose.yml`: For containerized deployment.
+
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/the-asind/budu_dolzhen_bot?utm_source=oss&utm_medium=github&utm_campaign=the-asind%2Fbudu_dolzhen_bot&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
