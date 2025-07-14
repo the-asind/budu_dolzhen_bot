@@ -12,6 +12,8 @@ This module tests:
 from datetime import datetime, timezone
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+from tests.conftest import make_mutable_inline_query
 from aiogram.types import (
     Chat, User, Message, InlineQuery, CallbackQuery,
     ChatMember, ChatMemberOwner, ChatMemberAdministrator,
@@ -122,7 +124,7 @@ class TestMultiModeSupport:
     def mock_debt_manager(self, mock_notification_service):
         """Create a mock debt manager."""
         manager = AsyncMock(spec=DebtManager)
-        manager.process_debt_message = AsyncMock()
+        manager.process_message = AsyncMock()
         return manager
 
     @pytest.fixture
@@ -176,7 +178,7 @@ class TestGroupVsPrivateChatBehavior(TestMultiModeSupport):
         with patch('bot.handlers.debt_handlers.DebtManager') as mock_debt_manager_class, \
              patch('bot.core.notification_service.NotificationService') as mock_notif_class:
             mock_debt_manager = AsyncMock()
-            mock_debt_manager.process_debt_message.return_value = MagicMock(errors=[])
+            mock_debt_manager.process_message.return_value = MagicMock(errors=[])
             mock_debt_manager_class.return_value = mock_debt_manager
             
             # Ensure NotificationService gets proper bot instance
@@ -190,7 +192,7 @@ class TestGroupVsPrivateChatBehavior(TestMultiModeSupport):
                 lambda key, **kwargs: f"Translated: {key}"
             )
 
-            mock_debt_manager.process_debt_message.assert_called_once()
+            mock_debt_manager.process_message.assert_called_once()
 
     async def test_group_chat_debt_creation_with_privacy_controls(
         self, mock_group_chat, mock_user, mock_bot, mock_notification_service, model_message
@@ -213,7 +215,7 @@ class TestGroupVsPrivateChatBehavior(TestMultiModeSupport):
         with patch('bot.handlers.debt_handlers.DebtManager') as mock_debt_manager_class, \
              patch('bot.core.notification_service.NotificationService') as mock_notif_class:
             mock_debt_manager = AsyncMock()
-            mock_debt_manager.process_debt_message.return_value = MagicMock(errors=[])
+            mock_debt_manager.process_message.return_value = MagicMock(errors=[])
             mock_debt_manager_class.return_value = mock_debt_manager
             
             # Ensure NotificationService gets proper bot instance
@@ -227,8 +229,8 @@ class TestGroupVsPrivateChatBehavior(TestMultiModeSupport):
                 lambda key, **kwargs: f"Translated: {key}"
             )
 
-            # Verify that group-specific logic is applied
-            mock_debt_manager.process_debt_message.assert_called_once()
+            # Debt processing should be skipped in groups
+            mock_debt_manager.process_message.assert_not_called()
 
     async def test_group_admin_permissions_required_for_sensitive_operations(
         self, mock_group_chat, mock_admin_user, mock_user, mock_bot, model_message
@@ -323,7 +325,7 @@ class TestGroupVsPrivateChatBehavior(TestMultiModeSupport):
     async def test_inline_query_parsing_valid_debt(self, mock_user, model_inline_query):
         """Test parsing of valid debt creation inline query."""
         # Add text attribute to inline query to fix AttributeError
-        inline_query = model_inline_query(
+        inline_query = make_mutable_inline_query(
             id="test_query_1",
             from_user=mock_user,
             query="@debtor 100 for coffee",
@@ -366,7 +368,7 @@ class TestGroupVsPrivateChatBehavior(TestMultiModeSupport):
 
         with patch('bot.handlers.debt_handlers.DebtManager') as mock_debt_manager_class:
             mock_debt_manager = AsyncMock()
-            mock_debt_manager.process_debt_message.return_value = MagicMock(errors=[])
+            mock_debt_manager.process_message.return_value = MagicMock(errors=[])
             mock_debt_manager_class.return_value = mock_debt_manager
 
             await handle_debt_message(
@@ -384,10 +386,10 @@ class TestGroupVsPrivateChatBehavior(TestMultiModeSupport):
 class TestInlineQueryFunctionality(TestMultiModeSupport):
     """Test inline query functionality with context awareness."""
 
-    async def test_inline_query_parsing_valid_debt_in_inline_context(self, mock_user, mock_bot, mock_notification_service, model_inline_query):
+    async def test_inline_query_parsing_valid_debt_in_inline_context(self, mock_user, mock_bot, mock_notification_service):
         """Test parsing of valid debt creation inline query in inline context."""
         # Add text attribute to inline query to fix AttributeError
-        inline_query = model_inline_query(
+        inline_query = make_mutable_inline_query(
             id="test_query_1",
             from_user=mock_user,
             query="@debtor 100 for coffee",
@@ -415,10 +417,10 @@ class TestInlineQueryFunctionality(TestMultiModeSupport):
                 # If parser fails, that's expected behavior for this test
                 pass
 
-    async def test_inline_query_parsing_invalid_debt(self, mock_user, model_inline_query):
+    async def test_inline_query_parsing_invalid_debt(self, mock_user):
         """Test handling of invalid debt creation inline query."""
         # Add text attribute to inline query to fix AttributeError
-        inline_query = model_inline_query(
+        inline_query = make_mutable_inline_query(
             id="test_query_2",
             from_user=mock_user,
             query="invalid query format",
@@ -438,10 +440,10 @@ class TestInlineQueryFunctionality(TestMultiModeSupport):
             # Expected behavior for invalid input
             pass
 
-    async def test_inline_query_context_aware_results(self, mock_user, model_inline_query):
+    async def test_inline_query_context_aware_results(self, mock_user):
         """Test that inline query results are context-aware."""
         # Add text attribute to inline query to fix AttributeError
-        inline_query = model_inline_query(
+        inline_query = make_mutable_inline_query(
             id="test_query_3",
             from_user=mock_user,
             query="@debtor 100",
@@ -457,11 +459,11 @@ class TestInlineQueryFunctionality(TestMultiModeSupport):
         assert hasattr(inline_query, 'text')
         assert inline_query.text == inline_query.query
 
-    async def test_inline_query_validation_and_sanitization(self, mock_user, model_inline_query):
+    async def test_inline_query_validation_and_sanitization(self, mock_user):
         """Test input validation and sanitization for inline queries."""
         malicious_query = "@debtor 100 <script>alert('xss')</script>"
         # Add text attribute to inline query to fix AttributeError
-        inline_query = model_inline_query(
+        inline_query = make_mutable_inline_query(
             id="test_query_4",
             from_user=mock_user,
             query=malicious_query,
