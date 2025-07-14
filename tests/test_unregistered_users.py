@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -19,6 +20,14 @@ from tests.conftest import make_mutable_message, make_mutable_callback_query, ma
 
 pytestmark = pytest.mark.asyncio
 
+@pytest_asyncio.fixture(autouse=True)
+async def _clear_queue():
+    if hasattr(UserMiddleware, "clear_all_notifications"):
+        await UserMiddleware.clear_all_notifications()
+    yield
+    if hasattr(UserMiddleware, "clear_all_notifications"):
+        await UserMiddleware.clear_all_notifications()
+
 
 class TestUnregisteredUserHandling:
     """Test suite for unregistered user handling scenarios."""
@@ -35,7 +44,7 @@ class TestUnregisteredUserHandling:
     @pytest.fixture
     def mock_user_repo(self):
         """Mock user repository with proper class method mocking."""
-        with patch('bot.db.repositories.UserRepository') as mock_repo:
+        with patch('bot.middlewares.user_middleware.UserRepository') as mock_repo:
             # Configure class methods directly since UserRepository uses @classmethod
             mock_repo.get_by_id = AsyncMock(return_value=None)
             mock_repo.get_by_username = AsyncMock(return_value=None)
@@ -107,7 +116,7 @@ class TestUnregisteredUserHandling:
             text="Hey @unregistered_user, you owe me $50",
             from_user=from_user,
             entities=[
-                MessageEntity(type=MessageEntityType.MENTION, offset=4, length=17)
+                MessageEntity(type=MessageEntityType.MENTION, offset=4, length=18)
             ]
         )
 
@@ -148,7 +157,7 @@ class TestUnregisteredUserDetection(TestUnregisteredUserHandling):
         data = {"bot": mock_bot, "event_from_user": mock_update_with_mention.message.from_user}
 
         # Execute
-        with patch('bot.handlers.common.UserRepository', mock_user_repo):
+        with patch('bot.middlewares.user_middleware.UserRepository', mock_user_repo):
             await user_middleware(handler, mock_update_with_mention, data)
 
         # Verify repository calls were made
@@ -204,7 +213,7 @@ class TestUnregisteredUserDetection(TestUnregisteredUserHandling):
         data = {"bot": mock_bot, "event_from_user": message.from_user}
 
         # Execute
-        with patch('bot.handlers.common.UserRepository', mock_user_repo):
+        with patch('bot.middlewares.user_middleware.UserRepository', mock_user_repo):
             await user_middleware(handler, update, data)
 
         # Verify repository calls
@@ -236,7 +245,7 @@ class TestUnregisteredUserDetection(TestUnregisteredUserHandling):
         data = {"bot": mock_bot, "event_from_user": mock_update_with_mention.message.from_user}
 
         # Execute
-        with patch('bot.handlers.common.UserRepository', mock_user_repo):
+        with patch('bot.middlewares.user_middleware.UserRepository', mock_user_repo):
             await user_middleware(handler, mock_update_with_mention, data)
 
         # Verify handler was called normally
@@ -357,7 +366,7 @@ class TestRegistrationEnforcement(TestUnregisteredUserHandling):
         data = {"bot": mock_bot, "event_from_user": unregistered_telegram_user}
 
         # Execute
-        with patch('bot.handlers.common.UserRepository', mock_user_repo):
+        with patch('bot.middlewares.user_middleware.UserRepository', mock_user_repo):
             result = await user_middleware(handler, update, data)
 
         # Verify repository was called to check user
@@ -399,7 +408,7 @@ class TestRegistrationEnforcement(TestUnregisteredUserHandling):
         data = {"bot": mock_bot, "event_from_user": message.from_user}
 
         # Execute
-        with patch('bot.handlers.common.UserRepository', mock_user_repo):
+        with patch('bot.middlewares.user_middleware.UserRepository', mock_user_repo):
             await user_middleware(handler, update, data)
 
         # Verify
@@ -434,7 +443,7 @@ class TestRegistrationEnforcement(TestUnregisteredUserHandling):
         data = {"bot": mock_bot, "event_from_user": unregistered_telegram_user}
 
         # Execute
-        with patch('bot.handlers.common.UserRepository', mock_user_repo):
+        with patch('bot.middlewares.user_middleware.UserRepository', mock_user_repo):
             result = await user_middleware(handler, mock_start_update, data)
 
         # Verify /start was processed and handler was called
@@ -476,6 +485,7 @@ class TestNotificationServiceUnregisteredHandling(TestUnregisteredUserHandling):
         """Test successful processing of queued notifications."""
         # Reset the mock to use the actual method
         notification_service.process_queued_notifications = notification_service.__class__.process_queued_notifications.__get__(notification_service)
+        notification_service.send_message = notification_service.__class__.send_message.__get__(notification_service)
         
         # Setup queue
         notification_service._unregistered_queue[123] = [
@@ -715,7 +725,7 @@ class TestRegistrationStateTracking(TestUnregisteredUserHandling):
         data = {"bot": mock_bot, "event_from_user": message.from_user}
 
         # Execute
-        with patch('bot.handlers.common.UserRepository', mock_user_repo):
+        with patch('bot.middlewares.user_middleware.UserRepository', mock_user_repo):
             await user_middleware(handler, update, data)
 
         # Verify repository calls
@@ -749,7 +759,7 @@ class TestRegistrationStateTracking(TestUnregisteredUserHandling):
 
         # Execute /start (transition to active)
         start_handler = AsyncMock()
-        with patch('bot.handlers.common.UserRepository', mock_user_repo):
+        with patch('bot.middlewares.user_middleware.UserRepository', mock_user_repo):
             await user_middleware(start_handler, mock_start_update, start_data)
 
         # Verify middleware processed the request
@@ -786,7 +796,7 @@ class TestIntegrationScenarios(TestUnregisteredUserHandling):
             text="@unregistered_user owes me $50 for lunch",
             from_user=from_user,
             entities=[
-                MessageEntity(type=MessageEntityType.MENTION, offset=0, length=17)
+                MessageEntity(type=MessageEntityType.MENTION, offset=0, length=18)
             ]
         )
 
@@ -810,6 +820,7 @@ class TestIntegrationScenarios(TestUnregisteredUserHandling):
             assert "unregistered_user" in stats
 
         # Step 2: Unregistered user starts bot
+        debt_handler.reset_mock()
         mock_bot.reset_mock()
         new_user = UserModel(
             user_id=unregistered_telegram_user.id,

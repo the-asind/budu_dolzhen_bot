@@ -540,10 +540,11 @@ def make_mutable_message(**kwargs):
     mock.answer = AsyncMock()
     mock.edit_text = AsyncMock()
     mock.reply = AsyncMock()
-    mock.message_id = kwargs.get('message_id', 1)
-    mock.text = kwargs.get('text', '')
-    mock.chat = kwargs.get('chat') or MagicMock()
-    mock.from_user = kwargs.get('from_user') or MagicMock()
+    mock.message_id = kwargs.get("message_id", 1)
+    mock.text = kwargs.get("text", "")
+    mock.chat = kwargs.get("chat") or MagicMock()
+    mock.from_user = kwargs.get("from_user") or MagicMock()
+    mock.entities = kwargs.get("entities", [])
     return mock
 
 
