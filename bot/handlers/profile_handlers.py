@@ -16,7 +16,11 @@ from ..db.models import User as UserModel
 
 from bot.keyboards.profile_kbs import get_settings_menu_kb, back_to_settings_kb
 from bot.locales.main import get_user_language, get_localization
-from bot.utils.validators import validate_username
+from bot.utils.validators import (
+    validate_username,
+    is_valid_contact_info,
+    validate_contact_info
+)
 
 user_repo = UserRepository()
 profile_router = Router(name="profile")
@@ -71,8 +75,6 @@ async def handle_contact_info_input(
     
     user_lang = await get_user_language(message.from_user.id, state)
     text = message.text or ""
-
-    from bot.utils.validators import is_valid_contact_info
 
     if not text.strip() or not is_valid_contact_info(text):
         await message.reply(str(get_localization(user_lang).profile_contact_invalid))
