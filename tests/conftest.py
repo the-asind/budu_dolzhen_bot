@@ -529,6 +529,7 @@ def mock_callback_query(mock_message):
     cq.answer = AsyncMock()
     cq.data = ""
     cq.from_user = MagicMock()
+    cq.from_user.id = 123456789
     cq.message = mock_message
     return cq
 

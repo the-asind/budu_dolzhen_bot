@@ -16,41 +16,38 @@ async def send_weekly_reports(bot: Bot):
     logger.info("Executing job: send_weekly_reports")
     settings = get_settings()
     db_path = settings.db.path
+    notif = NotificationService(bot)
     try:
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
-            users_cursor = await db.execute("SELECT user_id, username FROM users")
+            users_cursor = await db.execute(
+                "SELECT user_id, username FROM users WHERE reminder_enabled = 1"
+            )
             users = await users_cursor.fetchall()
-
-            # get NotificationService instance
-            notif = NotificationService(bot)
 
             for user in users:
                 user_id = user["user_id"]
-                # calculate total owed by user (debtor)
-                owe_cursor = await db.execute(
-                    "SELECT SUM(amount) AS total FROM debts WHERE debtor_id = ? AND status = 'active'",
-                    (user_id,),
-                )
-                owe_row = await owe_cursor.fetchone()
-                owes_total = owe_row["total"] if owe_row else 0
-
-                # calculate total owed to user (creditor)
-                owed_cursor = await db.execute(
-                    "SELECT SUM(amount) AS total FROM debts WHERE creditor_id = ? AND status = 'active'",
-                    (user_id,),
-                )
-                owed_row = await owed_cursor.fetchone()
-                owed_total = owed_row["total"] if owed_row else 0
-
-                # format message
-                text = (
-                    f"📊 Weekly Debt Summary 📊\n\n"
-                    f"You owe: {owes_total / 100:.2f}\n"
-                    f"Owed to you: {owed_total / 100:.2f}\n\n"
-                    f"Have a great week!"
-                )
                 try:
+                    owe_cursor = await db.execute(
+                        "SELECT SUM(amount) AS total FROM debts WHERE debtor_id = ? AND status = 'active'",
+                        (user_id,),
+                    )
+                    owe_row = await owe_cursor.fetchone()
+                    owes_total = owe_row["total"] or 0
+
+                    owed_cursor = await db.execute(
+                        "SELECT SUM(amount) AS total FROM debts WHERE creditor_id = ? AND status = 'active'",
+                        (user_id,),
+                    )
+                    owed_row = await owed_cursor.fetchone()
+                    owed_total = owed_row["total"] or 0
+
+                    text = (
+                        f"📊 Weekly Debt Summary 📊\n\n"
+                        f"You owe: {owes_total / 100:.2f}\n"
+                        f"Owed to you: {owed_total / 100:.2f}\n\n"
+                        f"Have a great week!"
+                    )
                     await notif.send_message(user_id, text)
                 except Exception as e:
                     logger.error(f"Failed to send weekly report to {user_id}: {e}")

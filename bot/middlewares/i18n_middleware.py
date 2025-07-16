@@ -85,6 +85,10 @@ class I18nMiddleware(BaseMiddleware):
         event: Update,
         data: Dict[str, Any],
     ) -> Any:
+        # allow instance-level patching by delegating to overridden callable if present
+        override = self.__dict__.get("__call__")
+        if override is not None and override is not I18nMiddleware.__call__:
+            return await override(handler, event, data)
         # Extract user_id and Telegram language_code from the incoming update
         user_id: Optional[int] = None
         telegram_lang: Optional[str] = None

@@ -39,25 +39,55 @@ _pool_initialized = False
 
 async def _initialize_schema(conn: aiosqlite.Connection) -> None:
     await conn.execute("PRAGMA foreign_keys = ON;")
-    await conn.execute("""
+    await conn.executescript(
+        """
         CREATE TABLE IF NOT EXISTS users (
-            user_id   INTEGER PRIMARY KEY AUTOINCREMENT,
-            username  TEXT    NOT NULL UNIQUE,
-            first_name TEXT   NOT NULL
+            user_id INTEGER PRIMARY KEY,
+            username TEXT UNIQUE,
+            first_name TEXT NOT NULL,
+            last_name TEXT,
+            language_code TEXT DEFAULT 'ru',
+            contact TEXT,
+            payday_days TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-    """)
-    await conn.execute("""
+
+        CREATE TABLE IF NOT EXISTS trusted_users (
+            user_id INTEGER NOT NULL,
+            trusted_user_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, trusted_user_id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+            FOREIGN KEY (trusted_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS debts (
-            debt_id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            creditor_id  INTEGER NOT NULL,
-            debtor_id    INTEGER NOT NULL,
-            amount       REAL    NOT NULL,
-            description  TEXT,
-            status       TEXT    NOT NULL DEFAULT 'pending_confirmation',
-            FOREIGN KEY(creditor_id) REFERENCES users(user_id),
-            FOREIGN KEY(debtor_id)   REFERENCES users(user_id)
+            debt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            creditor_id INTEGER NOT NULL,
+            debtor_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL,
+            description TEXT,
+            status TEXT NOT NULL CHECK(status IN ('pending', 'active', 'paid', 'rejected')) DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            confirmed_at DATETIME,
+            settled_at DATETIME,
+            FOREIGN KEY (creditor_id) REFERENCES users(user_id) ON DELETE CASCADE,
+            FOREIGN KEY (debtor_id) REFERENCES users(user_id) ON DELETE CASCADE
         );
-    """)
+
+        CREATE TABLE IF NOT EXISTS payments (
+            payment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            debt_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('pending_confirmation', 'confirmed')) DEFAULT 'pending_confirmation',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            confirmed_at DATETIME,
+            FOREIGN KEY (debt_id) REFERENCES debts(debt_id) ON DELETE CASCADE
+        );
+        """
+    )
     await conn.commit()
 
 

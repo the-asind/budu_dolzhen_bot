@@ -483,10 +483,14 @@ class TestLocalizationBestPractices:
         
         # Check that emoji usage is consistent for key messages
         test_keys = ["unknown_command", "error_generic", "start_welcome"]
+
+        def has_emoji(text: str) -> bool:
+            return any(0x1F300 <= ord(ch) <= 0x1FAFF for ch in text)
+
         for key in test_keys:
             if key in en_messages and key in ru_messages:
-                en_has_emoji = any(ord(char) > 127 for char in en_messages[key])
-                ru_has_emoji = any(ord(char) > 127 for char in ru_messages[key])
+                en_has_emoji = has_emoji(en_messages[key])
+                ru_has_emoji = has_emoji(ru_messages[key])
                 assert en_has_emoji == ru_has_emoji, f"Emoji usage should be consistent for key {key}"
     
     def test_localization_key_naming_conventions(self):
@@ -943,6 +947,9 @@ class TestLocalizationIntegrationScenarios:
             assert ru_text.strip(), f"Russian button text for {key} is empty"
             
             # Should contain emojis (most buttons have them)
-            en_has_emoji = any(ord(char) > 127 for char in en_text)
-            ru_has_emoji = any(ord(char) > 127 for char in ru_text)
+            def has_emoji(text: str) -> bool:
+                return any(0x1F300 <= ord(ch) <= 0x1FAFF for ch in text)
+
+            en_has_emoji = has_emoji(en_text)
+            ru_has_emoji = has_emoji(ru_text)
             assert en_has_emoji == ru_has_emoji, f"Emoji usage should be consistent for button {key}"

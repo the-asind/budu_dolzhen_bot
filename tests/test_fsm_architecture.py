@@ -46,6 +46,7 @@ def fixture_mock_message():
     message.text = "/stub"
     message.answer = AsyncMock()
     message.edit_text = AsyncMock()
+    message.reply = AsyncMock()
     user = MagicMock(spec=User)
     user.id = 12345
     user.is_bot = False
@@ -125,6 +126,7 @@ class TestFSMTransitions:
         message.text = "/settings"
         message.answer = AsyncMock()
         message.edit_text = AsyncMock()
+        message.reply = AsyncMock()
 
         # Nested attributes frequently accessed in the handler logic
         user = MagicMock(spec=User)
