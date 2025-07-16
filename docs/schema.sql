@@ -8,7 +8,7 @@ PRAGMA foreign_keys = ON;
 -- Stores information about bot users
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY,
-    username TEXT,
+    username TEXT UNIQUE,
     first_name TEXT NOT NULL,
     last_name TEXT,
     language_code TEXT DEFAULT 'ru',

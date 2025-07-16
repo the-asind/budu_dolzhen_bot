@@ -5,7 +5,23 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 
-from .connection import get_connection
+from . import connection
+import inspect
+
+
+async def _acquire_connection():
+    """Helper to obtain a connection from the connection module.
+
+    Some tests patch ``get_connection`` with a coroutine that immediately
+    raises.  If the returned object is a coroutine we simply await it so the
+    exception propagates as expected.  Otherwise we use it as an async context
+    manager.
+    """
+    ctx = connection.get_connection()
+    if inspect.iscoroutine(ctx):
+        return await ctx  # type: ignore[no-any-return]
+    return ctx
+
 from .models import (
     User as UserModel,
     Debt as DebtModel,
@@ -26,7 +42,8 @@ class UserRepository:
         Uses username as first_name internally to satisfy NOT NULL constraint.
         """
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     """
                     INSERT INTO users (username, first_name)
@@ -50,7 +67,8 @@ class UserRepository:
     async def get_by_id(cls, user_id: int) -> Optional[UserModel]:
         """Retrieve a user by their ID."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     "SELECT * FROM users WHERE user_id = ?",
                     (user_id,),
@@ -67,7 +85,8 @@ class UserRepository:
     async def get_by_username(cls, username: str) -> Optional[UserModel]:
         """Retrieve a user by their username."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     "SELECT * FROM users WHERE username = ?",
                     (username,),
@@ -81,10 +100,45 @@ class UserRepository:
             raise
 
     @classmethod
+    async def get_or_create_user(
+        cls,
+        *,
+        user_id: int,
+        username: str,
+        first_name: str,
+        language_code: str = "en",
+    ) -> UserModel:
+        """Return existing user or create a new record."""
+        existing = await cls.get_by_id(user_id)
+        if existing:
+            return existing
+        try:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
+                await conn.execute(
+                    """
+                    INSERT INTO users (user_id, username, first_name, language_code)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (user_id, username, first_name, language_code),
+                )
+                await conn.commit()
+                cursor = await conn.execute(
+                    "SELECT * FROM users WHERE user_id = ?",
+                    (user_id,),
+                )
+                row = await cursor.fetchone()
+                return UserModel(**dict(row))  # type: ignore
+        except Exception as e:
+            logger.exception("Failed to get_or_create user %s: %s", username, e)
+            raise
+        
+    @classmethod
     async def update_user_language(cls, user_id: int, language_code: str) -> None:
         """Update user's language preference."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 await conn.execute(
                     "UPDATE users SET language_code = ? WHERE user_id = ?",
                     (language_code, user_id),
@@ -98,7 +152,8 @@ class UserRepository:
     async def update_user_contact(cls, user_id: int, contact: str) -> None:
         """Update user's contact information."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 await conn.execute(
                     "UPDATE users SET contact = ? WHERE user_id = ?",
                     (contact, user_id),
@@ -112,7 +167,8 @@ class UserRepository:
     async def update_user_reminders(cls, user_id: int, payday_days: str) -> None:
         """Update user's reminder preferences."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 await conn.execute(
                     "UPDATE users SET payday_days = ? WHERE user_id = ?",
                     (payday_days, user_id),
@@ -129,7 +185,8 @@ class UserRepository:
         """
         try:
             # find trusted user's id
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     "SELECT user_id FROM users WHERE username = ?",
                     (trusted_username,),
@@ -158,7 +215,8 @@ class UserRepository:
         Check if user_id trusts the user with username other_username.
         """
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     """
                     SELECT 1 FROM trusted_users tu
@@ -180,7 +238,8 @@ class UserRepository:
     async def list_trusted(cls, user_id: int) -> List[UserModel]:
         """List all users trusted by the given user."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     """
                     SELECT u.* FROM trusted_users tu
@@ -200,7 +259,8 @@ class UserRepository:
     async def remove_trust(cls, user_id: int, trusted_username: str) -> None:
         """Remove trust relationship between users."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 # Find trusted user's id
                 cursor = await conn.execute(
                     "SELECT user_id FROM users WHERE username = ?",
@@ -235,7 +295,8 @@ class DebtRepository:
     ) -> DebtModel:
         """Create a new debt record."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     """
                     INSERT INTO debts (creditor_id, debtor_id, amount, description)
@@ -263,7 +324,8 @@ class DebtRepository:
     async def list_active_by_user(cls, user_id: int) -> List[DebtModel]:
         """List all active debts where user is creditor or debtor."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     """
                     SELECT * FROM debts
@@ -283,7 +345,8 @@ class DebtRepository:
     async def get(cls, debt_id: int) -> Optional[DebtModel]:
         """Get a debt by its ID."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     "SELECT * FROM debts WHERE debt_id = ?", (debt_id,)
                 )
@@ -300,8 +363,11 @@ class DebtRepository:
         cls, debt_id: int, status: DebtStatusLiteral
     ) -> DebtModel:
         """Update the status of a debt."""
+        if status not in {"pending", "active", "paid", "rejected"}:
+            raise ValueError(f"Invalid status: {status}")
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 await conn.execute(
                     "UPDATE debts SET status = ? WHERE debt_id = ?",
                     (status, debt_id),
@@ -311,6 +377,8 @@ class DebtRepository:
                     "SELECT * FROM debts WHERE debt_id = ?", (debt_id,)
                 )
                 row = await cursor.fetchone()
+                if row is None:
+                    raise ValueError("Debt not found")
                 return DebtModel(**dict(row))  # type: ignore
         except Exception as e:
             logger.exception("Failed to update status for debt %d: %s", debt_id, e)
@@ -323,8 +391,19 @@ class PaymentRepository:
     @classmethod
     async def create_payment(cls, debt_id: int, amount: int) -> PaymentModel:
         """Create a new payment record for a debt."""
+        if amount <= 0:
+            raise ValueError("Amount must be positive")
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
+                # ensure debt exists
+                cursor = await conn.execute(
+                    "SELECT 1 FROM debts WHERE debt_id = ?",
+                    (debt_id,),
+                )
+                if await cursor.fetchone() is None:
+                    raise ValueError("Debt not found")
+
                 cursor = await conn.execute(
                     """
                     INSERT INTO payments (debt_id, amount)
@@ -349,7 +428,8 @@ class PaymentRepository:
     async def get_by_debt(cls, debt_id: int) -> List[PaymentModel]:
         """Get all payments for a specific debt."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     """
                     SELECT * FROM payments
@@ -368,7 +448,8 @@ class PaymentRepository:
     async def confirm_payment(cls, payment_id: int) -> PaymentModel:
         """Confirm a pending payment."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 await conn.execute(
                     """
                     UPDATE payments
@@ -383,6 +464,8 @@ class PaymentRepository:
                     "SELECT * FROM payments WHERE payment_id = ?", (payment_id,)
                 )
                 row = await cursor.fetchone()
+                if row is None:
+                    raise ValueError("Payment not found")
                 return PaymentModel(**dict(row))  # type: ignore
         except Exception as e:
             logger.exception("Failed to confirm payment %d: %s", payment_id, e)
@@ -396,7 +479,8 @@ class TrustedUserRepository:
     async def add_trust(cls, user_id: int, trusted_user_id: int) -> None:
         """Add a trust relationship."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 await conn.execute(
                     """
                     INSERT OR IGNORE INTO trusted_users (user_id, trusted_user_id)
@@ -418,7 +502,8 @@ class TrustedUserRepository:
     async def remove_trust(cls, user_id: int, trusted_user_id: int) -> None:
         """Remove a trust relationship."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 await conn.execute(
                     """
                     DELETE FROM trusted_users
@@ -440,7 +525,8 @@ class TrustedUserRepository:
     async def list_trusted(cls, user_id: int) -> List[UserModel]:
         """List all users trusted by the given user."""
         try:
-            async with get_connection() as conn:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
                 cursor = await conn.execute(
                     """
                     SELECT u.* FROM trusted_users tu

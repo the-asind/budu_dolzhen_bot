@@ -60,5 +60,5 @@ async def test_auto_confirmation_when_trusted() -> None:
 
     # Debug output for debt status after creation
     print(f"Debug: debt.status={debt.status} (debt_id={debt.debt_id})")
-    # Expect pending until auto-confirmation logic is implemented
-    assert debt.status == "pending"
+    # When debtor trusts the creditor the debt should be active immediately
+    assert debt.status == "active"
