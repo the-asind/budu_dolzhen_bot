@@ -1,102 +1,110 @@
 # Budu Dolzhen Bot
 
-"Budu Dolzhen" (a Russian play on words for "I'll be in your debt") is a Telegram bot designed to help friends track shared expenses and debts. It allows for quick, natural language input to record who owes whom, handles confirmations, tracks payments, and provides summaries, all within Telegram.
+Budu Dolzhen Bot ("Буду Должен") is a Telegram bot for tracking shared expenses and debts between friends or group members. It parses free‑form messages, keeps confirmations transparent, and reminds participants about outstanding balances.
 
-## Features
+## Key Features
 
-- **Natural Language Debt Parsing:** Add debts with simple messages like `@user1 @user2 1500 for pizza`.
-- **Expression Support:** Calculate amounts on the fly: `@friend 3000/3 for a shared gift`.
-- **Debt Confirmation:** All debts require confirmation from the debtor, ensuring fairness and preventing fraud.
-- **Payment Tracking:** Mark debts as partially or fully paid, with confirmation from the creditor.
-- **User Settings:** Configure payment details, reminders, and trusted users via an inline menu.
-- **Scheduled Reminders:** Get weekly summaries and payday reminders to settle up.
-- **Multi-language Support:** Currently supports English and Russian.
+- **Natural language input** – Record debts using short messages like `@user1 1200 for coffee` or split amounts between several users: `я @user1 @user2 3000/3 торт`.
+- **Arithmetic expressions** – Amounts can include basic `+`, `-`, `*` and `/` expressions.
+- **Confirmation workflow** – Debtors confirm each entry via inline buttons to avoid disputes.
+- **Payment tracking** – Register partial or full repayments with two‑sided confirmation.
+- **Reminders and reports** – Weekly summaries and optional payday notifications via APScheduler.
+- **Settings menu** – Manage contact details, reminder days and trusted users through an FSM‑driven interface.
+- **Localization** – English and Russian message catalogues are included.
+- **Repository pattern** – All data access is routed through asynchronous repositories using SQLite.
 
-## Getting Started
+## Project Structure
 
-### Prerequisites
+```
+bot/              # Application package
+├─ core/          # Business logic: debt parsing, managers, notification service
+├─ db/            # Database models, repositories and connection pool
+├─ handlers/      # aiogram message and callback handlers
+├─ keyboards/     # Inline keyboard factories
+├─ locales/       # JSON translation files and i18n helpers
+├─ middlewares/   # User, logging and i18n middlewares
+├─ scheduler/     # Scheduled jobs (weekly reports, timeout checks)
+└─ utils/         # Validators and helpers
+```
+Additional top‑level files:
+
+- `main.py` – Entry point that starts the bot and scheduler.
+- `docs/schema.sql` – Database schema used during initialization.
+- `Dockerfile` and `docker-compose.yml` – Container configuration.
+- `tests/` – Extensive pytest suite covering parsing, FSM flows and the scheduler.
+
+## Requirements
 
 - Python 3.12+
-- Docker and Docker Compose (for containerized deployment)
-- A Telegram Bot Token from [@BotFather](https://t.me/BotFather)
+- Telegram Bot API token from [@BotFather](https://t.me/BotFather)
+- (Optional) Docker and Docker Compose for containerized deployment
 
-### Installation
+## Installation
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/budu-dolzhen-bot.git
-    cd budu-dolzhen-bot
-    ```
+```bash
+# Clone the repository
+git clone https://github.com/your-username/budu_dolzhen_bot.git
+cd budu_dolzhen_bot
 
-2.  **Create a virtual environment:**
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate  # On Windows, use `.venv\Scripts\activate`
-    ```
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate
 
-3.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+# Install runtime dependencies
+pip install -r requirements.txt
+```
 
-### Configuration
+### Environment configuration
 
-1.  Copy the example environment file:
-    ```bash
-    cp .env.example .env
-    ```
+Create a `.env` file in the project root with the following variables:
 
-2.  Edit the `.env` file and fill in your details:
-    - `BOT_TOKEN`: Your Telegram bot token.
-    - `ADMIN_ID`: The Telegram user ID of the bot administrator.
-    - `DATABASE_PATH`: The path to the SQLite database file (e.g., `data/bot.db`).
-    - `LOG_LEVEL`: The logging level (e.g., `INFO`, `DEBUG`).
+```
+BOT_TOKEN=your_bot_token
+BOT_ADMIN_ID=123456789
+DATABASE_PATH=budu_dolzhen.db
+LOG_LEVEL=INFO
+SCHEDULER_TIMEZONE=UTC
+```
 
-## Usage
+`BOT_ADMIN_ID` is used for privileged commands and error notifications.
 
-### Running the Bot
+## Running the bot
 
-#### Locally
-
-To run the bot directly using Python:
+### Locally
 
 ```bash
 python main.py
 ```
 
-#### With Docker
+### With Docker
 
-To run the bot in a Docker container:
+```bash
+docker-compose up --build
+```
 
-1.  Make sure your `.env` file is configured.
-2.  Build and run the container in detached mode:
-    ```bash
-    docker-compose up --build -d
-    ```
+The container uses the same `.env` file and persists the SQLite database in the `data/` volume.
 
-### Interacting with the Bot
+## Usage basics
 
-- **/start**: Initializes the bot and registers you as a user.
-- **/help**: Shows a detailed help message with command examples.
-- **/settings**: Opens the user settings menu to manage your contact info, reminders, and trusted users.
-- **Adding a debt**: Simply send a message in a private chat or a group with the format `@username <amount> [description]`.
+- `/start` – Register with the bot and see onboarding instructions.
+- `/help` – Detailed help with examples and tips.
+- `/settings` – Open the profile settings menu (contact info, reminders, trusted users).
+- **Recording debts** – Mention users with an amount and optional description. Example:
+  `@alice @bob 900/3 dinner` – both users owe you 300 each.
+- **Marking payments** – Send `скинул @alice 1000` in a private chat with the bot to log a payment.
 
-## Project Architecture
+The bot works in private chats and groups; pending confirmations expire after 23 hours if not accepted.
 
-The bot is built using `aiogram` and follows a modular structure to separate concerns:
+## Running tests
 
-- `main.py`: The main entrypoint that initializes the bot, dispatcher, and all components.
-- `bot/`: The core application package.
-  - `core/`: Contains the main business logic (debt parsing, managers).
-  - `db/`: Handles database connections, models, and repositories.
-  - `handlers/`: Contains all the message and callback query handlers.
-  - `keyboards/`: Functions for generating inline keyboards.
-  - `locales/`: Localization files for multi-language support.
-  - `middlewares/`: Custom middlewares for logging, user management, and i18n.
-  - `scheduler/`: Logic for scheduled tasks like reminders.
-  - `utils/`: Shared utility functions (validators, formatters).
-- `docs/`: Contains the database schema (`schema.sql`).
-- `tests/`: Contains tests for the application (currently a work in progress).
-- `Dockerfile` & `docker-compose.yml`: For containerized deployment.
+Development dependencies are listed in `requirements-dev.txt`.
+Install them in your virtual environment and run:
 
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/the-asind/budu_dolzhen_bot?utm_source=oss&utm_medium=github&utm_campaign=the-asind%2Fbudu_dolzhen_bot&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+## Contributing
+
+Issues and pull requests are welcome. Please ensure new features include tests and documentation.
