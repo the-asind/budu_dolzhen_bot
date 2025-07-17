@@ -2,7 +2,6 @@ import json
 import logging
 import time
 import asyncio
-from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Optional, Set, Tuple
 
 from aiogram import BaseMiddleware
@@ -14,6 +13,7 @@ from ..handlers.language_handlers import (
     detect_user_language_from_telegram,
     get_user_language_preference,
 )
+from ..db.repositories import UserRepository
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 _lang_cache: Dict[int, Tuple[str, float]] = {}
 _cache_lock = asyncio.Lock()
 CACHE_TTL = 300  # seconds
+
 
 def get_i18n_instance(domain: str = "bot") -> Callable[[str], Callable[..., str]]:
     """
@@ -55,7 +56,9 @@ def get_i18n_instance(domain: str = "bot") -> Callable[[str], Callable[..., str]
             template = lang_data.get(text_key)
             if template is None:
                 if (lang, text_key) not in runtime_missing:
-                    logger.debug("Missing translation for key '%s' in lang '%s'", text_key, lang)
+                    logger.debug(
+                        "Missing translation for key '%s' in lang '%s'", text_key, lang
+                    )
                     runtime_missing.add((lang, text_key))
                 template = text_key
             try:
@@ -73,12 +76,15 @@ def get_i18n_instance(domain: str = "bot") -> Callable[[str], Callable[..., str]
 
     return gettext_func
 
+
 i18n_factory = get_i18n_instance()
+
 
 class I18nMiddleware(BaseMiddleware):
     """
     Middleware for dynamic language detection, caching, and localization.
     """
+
     async def __call__(
         self,
         handler: Callable[[Update, Dict[str, Any]], Awaitable[Any]],
@@ -93,17 +99,27 @@ class I18nMiddleware(BaseMiddleware):
         user_id: Optional[int] = None
         telegram_lang: Optional[str] = None
 
-        if hasattr(event, "message") and isinstance(event.message, Message) and event.message.from_user:
+        if (
+            hasattr(event, "message")
+            and isinstance(event.message, Message)
+            and event.message.from_user
+        ):
             user_id = event.message.from_user.id
             telegram_lang = event.message.from_user.language_code
-        elif hasattr(event, "callback_query") and isinstance(event.callback_query, CallbackQuery) and event.callback_query.from_user:
+        elif (
+            hasattr(event, "callback_query")
+            and isinstance(event.callback_query, CallbackQuery)
+            and event.callback_query.from_user
+        ):
             user_id = event.callback_query.from_user.id
             telegram_lang = event.callback_query.from_user.language_code
 
         # Automatic language detection from Telegram settings
         if user_id and telegram_lang:
             try:
-                new_lang = await detect_user_language_from_telegram(user_id, telegram_lang)
+                new_lang = await detect_user_language_from_telegram(
+                    user_id, telegram_lang, UserRepository
+                )
                 if new_lang:
                     async with _cache_lock:
                         _lang_cache[user_id] = (new_lang, time.time())
@@ -129,7 +145,11 @@ class I18nMiddleware(BaseMiddleware):
                     try:
                         lang_code = await get_user_language_preference(user_id)
                     except Exception as e:
-                        logger.error("Failed to get language preference for user %d: %s", user_id, e)
+                        logger.error(
+                            "Failed to get language preference for user %d: %s",
+                            user_id,
+                            e,
+                        )
                         lang_code = "ru"
                 else:
                     lang_code = "ru"

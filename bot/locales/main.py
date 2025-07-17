@@ -5,52 +5,53 @@ from aiogram.fsm.context import FSMContext
 # simple cache for loaded localization files
 _LOCALIZATIONS = {}
 
+
 class Localization:
     _BUTTON_GROUPS = {
-        'debt_buttons': {
-            'agree': 'button_agree',
-            'decline': 'button_decline',
-            'pay': 'button_pay',
-            'cancel': 'button_cancel',
-            'back': 'button_back',
-            'details': 'button_details',
-            'recreate': 'button_recreate',
+        "debt_buttons": {
+            "agree": "button_agree",
+            "decline": "button_decline",
+            "pay": "button_pay",
+            "cancel": "button_cancel",
+            "back": "button_back",
+            "details": "button_details",
+            "recreate": "button_recreate",
         },
-        'payment_buttons': {
-            'approve': 'button_approve',
-            'reject': 'button_reject',
-            'cancel': 'button_cancel',
-            'receipt': 'button_receipt',
+        "payment_buttons": {
+            "approve": "button_approve",
+            "reject": "button_reject",
+            "cancel": "button_cancel",
+            "receipt": "button_receipt",
         },
-        'navigation_buttons': {
-            'prev': 'button_prev',
-            'next': 'button_next',
-            'back': 'button_back',
+        "navigation_buttons": {
+            "prev": "button_prev",
+            "next": "button_next",
+            "back": "button_back",
         },
-        'debt_filter_buttons': {
-            'active': 'button_filter_active',
-            'pending': 'button_filter_pending',
-            'all': 'button_filter_all',
+        "debt_filter_buttons": {
+            "active": "button_filter_active",
+            "pending": "button_filter_pending",
+            "all": "button_filter_all",
         },
-        'debt_actions': {
-            'pay_full': 'button_pay_full',
-            'pay_partial': 'button_pay_partial',
-            'remind': 'button_remind',
-            'view_history': 'button_view_history',
-            'back_to_list': 'button_back_to_list',
+        "debt_actions": {
+            "pay_full": "button_pay_full",
+            "pay_partial": "button_pay_partial",
+            "remind": "button_remind",
+            "view_history": "button_view_history",
+            "back_to_list": "button_back_to_list",
         },
-        'processing_buttons': {
-            'cancel': 'button_cancel',
+        "processing_buttons": {
+            "cancel": "button_cancel",
         },
-        'summary_buttons': {
-            'view_debts': 'button_view_debts',
-            'view_credits': 'button_view_credits',
-            'create_debt': 'button_create_debt',
-            'refresh': 'button_refresh',
+        "summary_buttons": {
+            "view_debts": "button_view_debts",
+            "view_credits": "button_view_credits",
+            "create_debt": "button_create_debt",
+            "refresh": "button_refresh",
         },
-        'offset_buttons': {
-            'confirm': 'button_offset_confirm',
-            'cancel': 'button_offset_cancel',
+        "offset_buttons": {
+            "confirm": "button_offset_confirm",
+            "cancel": "button_offset_cancel",
         },
     }
 
@@ -82,19 +83,26 @@ class Localization:
             return result
 
         # Allows accessing localization keys like loc.SETTINGS
-        return _LOCALIZATIONS.get(self.lang_code, {}).get(name.upper(), f"_{name.upper()}_")
+        loc_data = _LOCALIZATIONS.get(self.lang_code, {})
+        for key in (name, name.upper(), name.lower()):
+            if key in loc_data:
+                return loc_data[key]
+        return f"_{name.upper()}_"
 
     @property
     def settings_buttons(self) -> dict:
         return _LOCALIZATIONS.get(self.lang_code, {}).get("settings_buttons", {})
 
+
 def get_localization(lang_code: str) -> Localization:
     return Localization(lang_code)
+
 
 async def get_user_language(user_id: int, state: FSMContext) -> str:
     # TODO: Integrate with user repository to get/set user language
     data = await state.get_data()
     return data.get("language", "en")
+
 
 def _(key: str, **kwargs) -> str:
     """Translation shortcut for default (English) locale."""

@@ -1,6 +1,8 @@
 import logging
+from aiogram import Bot
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 try:
     from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore  # type: ignore
 except Exception:  # pragma: no cover
@@ -26,6 +28,7 @@ except Exception:  # pragma: no cover
         def shutdown(self):
             self.jobs.clear()
 
+
 from pytz import timezone
 
 from ..config import get_settings
@@ -40,27 +43,39 @@ class SchedulerManager:
     def __init__(self):
         settings = get_settings()
         db_path = settings.db.path.replace(".db", "_scheduler.db")
-        
-        jobstores = {
-            "default": SQLAlchemyJobStore(url=f"sqlite:///{db_path}")
-        }
-        
+
+        jobstores = {"default": SQLAlchemyJobStore(url=f"sqlite:///{db_path}")}
+
         self._scheduler = AsyncIOScheduler(
-            jobstores=jobstores,
-            timezone=timezone(settings.scheduler.timezone)
+            jobstores=jobstores, timezone=timezone(settings.scheduler.timezone)
         )
 
-    def start(self):
-        """Starts the scheduler and adds the jobs."""
+    def start(self, bot: Bot | None = None) -> None:
+        """Start the scheduler and register jobs.
+
+        Parameters
+        ----------
+        bot: Bot | None
+            Telegram bot instance used by scheduled jobs. If omitted, jobs will
+            receive ``None`` which is acceptable for unit tests where jobs are
+            not executed.
+        """
+
         try:
-            # Add jobs to the scheduler
             self._scheduler.add_job(
-                jobs.check_confirmation_timeouts, "interval", hours=1
+                jobs.check_confirmation_timeouts,
+                "interval",
+                hours=1,
+                kwargs={"bot": bot},
             )
             self._scheduler.add_job(
-                jobs.send_weekly_reports, "cron", day_of_week="mon", hour=10
+                jobs.send_weekly_reports,
+                "cron",
+                day_of_week="mon",
+                hour=10,
+                kwargs={"bot": bot},
             )
-            
+
             self._scheduler.start()
             logger.info("Scheduler started with jobs.")
         except Exception as e:
@@ -77,4 +92,4 @@ class SchedulerManager:
         return self._scheduler
 
 
-scheduler_manager = SchedulerManager() 
+scheduler_manager = SchedulerManager()

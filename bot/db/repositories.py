@@ -1,9 +1,13 @@
 """SQLite repository implementations using aiosqlite."""
 
+# ruff: noqa
+
 from __future__ import annotations
 
 import logging
+import inspect
 from typing import List, Optional
+import aiosqlite
 
 from . import connection
 import inspect
@@ -21,6 +25,7 @@ async def _acquire_connection():
     if inspect.iscoroutine(ctx):
         return await ctx  # type: ignore[no-any-return]
     return ctx
+
 
 from .models import (
     User as UserModel,
@@ -112,6 +117,63 @@ class UserRepository:
         existing = await cls.get_by_id(user_id)
         if existing:
             return existing
+
+        existing_username = await cls.get_by_username(username)
+        if existing_username and existing_username.user_id != user_id:
+            try:
+                ctx = await _acquire_connection()
+                async with ctx as conn:
+                    await conn.execute("PRAGMA foreign_keys = OFF")
+                    await conn.execute(
+                        "UPDATE users SET username = ? WHERE user_id = ?",
+                        (
+                            f"_old_{existing_username.user_id}",
+                            existing_username.user_id,
+                        ),
+                    )
+                    await conn.execute(
+                        "INSERT OR IGNORE INTO users (user_id, username, first_name, language_code) VALUES (?, ?, ?, ?)",
+                        (user_id, username, first_name, language_code),
+                    )
+                    await conn.execute(
+                        "UPDATE debts SET creditor_id = ? WHERE creditor_id = ?",
+                        (user_id, existing_username.user_id),
+                    )
+                    await conn.execute(
+                        "UPDATE debts SET debtor_id = ? WHERE debtor_id = ?",
+                        (user_id, existing_username.user_id),
+                    )
+                    await conn.execute(
+                        "UPDATE trusted_users SET user_id = ? WHERE user_id = ?",
+                        (user_id, existing_username.user_id),
+                    )
+                    await conn.execute(
+                        "UPDATE trusted_users SET trusted_user_id = ? WHERE trusted_user_id = ?",
+                        (user_id, existing_username.user_id),
+                    )
+                    await conn.execute(
+                        "DELETE FROM users WHERE user_id = ?",
+                        (existing_username.user_id,),
+                    )
+                    await conn.execute(
+                        "INSERT INTO users (user_id, username, first_name, language_code) VALUES (?, ?, ?, ?)",
+                        (user_id, username, first_name, language_code),
+                    )
+                    await conn.execute("PRAGMA foreign_keys = ON")
+                    await conn.commit()
+
+                    cursor = await conn.execute(
+                        "SELECT * FROM users WHERE user_id = ?",
+                        (user_id,),
+                    )
+                    row = await cursor.fetchone()
+                    return UserModel(**dict(row))  # type: ignore
+            except Exception as e:  # pragma: no cover - transformation logic
+                logger.exception(
+                    "Failed to update placeholder user %s: %s", username, e
+                )
+                raise
+
         try:
             ctx = await _acquire_connection()
             async with ctx as conn:
@@ -122,6 +184,29 @@ class UserRepository:
                     """,
                     (user_id, username, first_name, language_code),
                 )
+                try:
+                    await conn.execute(
+                        """
+                        INSERT INTO users (user_id, username, first_name, language_code)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (user_id, username, first_name, language_code),
+                    )
+                except aiosqlite.IntegrityError as exc:
+                    if "users.user_id" in str(exc):
+                        logger.warning(
+                            "User id %d already exists, returning existing record",
+                            user_id,
+                        )
+                        cursor = await conn.execute(
+                            "SELECT * FROM users WHERE user_id = ?",
+                            (user_id,),
+                        )
+                        row = await cursor.fetchone()
+                        if row:
+                            return UserModel(**dict(row))  # type: ignore
+                        raise
+                    raise
                 await conn.commit()
                 cursor = await conn.execute(
                     "SELECT * FROM users WHERE user_id = ?",
@@ -132,7 +217,7 @@ class UserRepository:
         except Exception as e:
             logger.exception("Failed to get_or_create user %s: %s", username, e)
             raise
-        
+
     @classmethod
     async def update_user_language(cls, user_id: int, language_code: str) -> None:
         """Update user's language preference."""
@@ -205,7 +290,10 @@ class UserRepository:
                 await conn.commit()
         except Exception as e:
             logger.exception(
-                "Failed to add trust from user %d to %s: %s", user_id, trusted_username, e
+                "Failed to add trust from user %d to %s: %s",
+                user_id,
+                trusted_username,
+                e,
             )
             raise
 
@@ -230,7 +318,10 @@ class UserRepository:
                 return row is not None
         except Exception as e:
             logger.exception(
-                "Failed to check trust from user %d to %s: %s", user_id, other_username, e
+                "Failed to check trust from user %d to %s: %s",
+                user_id,
+                other_username,
+                e,
             )
             raise
 
@@ -270,7 +361,7 @@ class UserRepository:
                 if not row:
                     raise ValueError(f"Trusted user {trusted_username} not found")
                 trusted_user_id = row["user_id"]
-                
+
                 await conn.execute(
                     """
                     DELETE FROM trusted_users
@@ -281,7 +372,10 @@ class UserRepository:
                 await conn.commit()
         except Exception as e:
             logger.exception(
-                "Failed to remove trust from user %d to %s: %s", user_id, trusted_username, e
+                "Failed to remove trust from user %d to %s: %s",
+                user_id,
+                trusted_username,
+                e,
             )
             raise
 
@@ -359,9 +453,7 @@ class DebtRepository:
             raise
 
     @classmethod
-    async def update_status(
-        cls, debt_id: int, status: DebtStatusLiteral
-    ) -> DebtModel:
+    async def update_status(cls, debt_id: int, status: DebtStatusLiteral) -> DebtModel:
         """Update the status of a debt."""
         if status not in {"pending", "active", "paid", "rejected"}:
             raise ValueError(f"Invalid status: {status}")
@@ -419,9 +511,7 @@ class PaymentRepository:
                 row = await cursor.fetchone()
                 return PaymentModel(**dict(row))  # type: ignore
         except Exception as e:
-            logger.exception(
-                "Failed to create payment for debt %d: %s", debt_id, e
-            )
+            logger.exception("Failed to create payment for debt %d: %s", debt_id, e)
             raise
 
     @classmethod

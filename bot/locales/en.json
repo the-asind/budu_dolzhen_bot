@@ -60,7 +60,7 @@
     "profile_contact_invalid": "Invalid contact format. Please try again.",
     "reminder_settings_prompt": "Please choose your reminder settings.",
     "reminder_settings_saved": "Great! Your reminder preferences have been successfully saved.",
-    "reminder_invalid_day": "Invalid day. Please select from Monday, Tuesday, etc.",
+    "reminder_invalid_day": "Invalid day. Select your Paydays in month: like \"5,20\".",
     "weekly_report_title": "Weekly Debt Report",
     "weekly_report_intro": "Here is the summary of your debts for the past week:",
     "reminder_payday_title": "Payday Reminder",
@@ -137,5 +137,12 @@
     "debt_group_start_bot_first": "Please start the bot before using this feature.",
     "onboarding_private_step1": "Step 1: To record a debt, mention a user with @username followed by amount and description.",
     "onboarding_private_step2": "Step 2: Use /pay to record payments and settle debts.",
-    "onboarding_private_step3": "Step 3: Use /settings to configure your preferences and trusted users."
+    "onboarding_private_step3": "Step 3: Use /settings to configure your preferences and trusted users.",
+    "onboarding_private_example": "Example: @friend 500 for coffee",
+    "onboarding_resources": "Here are some helpful resources:",
+    "btn_github": "\ud83d\udd27 GitHub",
+    "TRUSTED_USERS_MENU": "Trusted Users",
+    "TRUSTED_USER_ADD_PROMPT": "Add Trusted User",
+    "TRUSTED_USER_REMOVE_PROMPT": "Remove Trusted User",
+    "GENERIC_BACK": "Back"
 }

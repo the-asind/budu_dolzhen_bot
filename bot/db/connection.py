@@ -21,6 +21,7 @@ POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "5"))
 POOL_TIMEOUT = float(os.getenv("DB_POOL_TIMEOUT", "30"))  # seconds
 CURRENT_SCHEMA_VERSION = 1
 
+
 def find_project_root():
     current = Path(__file__).parent
     while current != current.parent:
@@ -28,6 +29,7 @@ def find_project_root():
             return current
         current = current.parent
     return Path(__file__).parents[2]  # fallback
+
 
 SCHEMA_FILE = find_project_root() / "docs" / "schema.sql"
 logger = logging.getLogger(__name__)
@@ -106,18 +108,32 @@ async def _initialize_database() -> None:
                     logger.info("Applying initial schema from %s", SCHEMA_FILE)
                     schema_sql = SCHEMA_FILE.read_text(encoding="utf-8")
                     await conn.executescript(schema_sql)
-                    logger.info("Initial schema applied, version set to %d", CURRENT_SCHEMA_VERSION)
+                    logger.info(
+                        "Initial schema applied, version set to %d",
+                        CURRENT_SCHEMA_VERSION,
+                    )
                 else:
-                    logger.info("Applying built-in minimal schema (no schema.sql found)")
+                    logger.info(
+                        "Applying built-in minimal schema (no schema.sql found)"
+                    )
                     await _initialize_schema(conn)
                 await conn.execute(f"PRAGMA user_version = {CURRENT_SCHEMA_VERSION};")
                 await conn.commit()
             elif current_version < CURRENT_SCHEMA_VERSION:
-                logger.info("Running migrations from version %d to %d", current_version, CURRENT_SCHEMA_VERSION)
+                logger.info(
+                    "Running migrations from version %d to %d",
+                    current_version,
+                    CURRENT_SCHEMA_VERSION,
+                )
                 await conn.execute(f"PRAGMA user_version = {CURRENT_SCHEMA_VERSION};")
-                logger.info("Migrations applied, schema version updated to %d", CURRENT_SCHEMA_VERSION)
+                logger.info(
+                    "Migrations applied, schema version updated to %d",
+                    CURRENT_SCHEMA_VERSION,
+                )
             else:
-                logger.info("Database schema is up-to-date (version %d)", current_version)
+                logger.info(
+                    "Database schema is up-to-date (version %d)", current_version
+                )
     except Exception as e:
         logger.exception("Failed to initialize or migrate database: %s", e)
         raise
@@ -157,7 +173,9 @@ async def _initialize_pool() -> None:
         for _ in range(10):
             await _pool.put(conn)
         _pool_initialized = True
-        logger.info("Database connection pool initialized with a shared in-memory connection (capacity: 10)")
+        logger.info(
+            "Database connection pool initialized with a shared in-memory connection (capacity: 10)"
+        )
         return
 
     await _initialize_database()
@@ -214,7 +232,9 @@ async def get_connection() -> AsyncIterator[aiosqlite.Connection]:
     try:
         await conn.execute("SELECT 1;")
     except Exception as e:
-        logger.warning("Database connection is invalid, recreating new connection: %s", e)
+        logger.warning(
+            "Database connection is invalid, recreating new connection: %s", e
+        )
         try:
             new_conn = await aiosqlite.connect(
                 DATABASE_PATH,
@@ -253,3 +273,22 @@ async def get_connection() -> AsyncIterator[aiosqlite.Connection]:
                 logger.debug("Returned database connection to pool")
             except Exception as e:
                 logger.error("Failed to return database connection to pool: %s", e)
+
+
+async def close_pool() -> None:
+    """Close all connections in the pool and reset its state."""
+    global _pool, _pool_initialized
+
+    if _pool is None:
+        return
+
+    while not _pool.empty():
+        conn = await _pool.get()
+        try:
+            await conn.close()
+        except Exception as exc:  # pragma: no cover - cleanup best effort
+            logger.warning("Error closing DB connection: %s", exc)
+
+    _pool = None
+    _pool_initialized = False
+    logger.info("Database connection pool closed")

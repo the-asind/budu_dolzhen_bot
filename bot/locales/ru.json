@@ -60,7 +60,7 @@
     "profile_contact_invalid": "Неверный формат контакта. Попробуйте еще раз.",
     "reminder_settings_prompt": "Пожалуйста, выберите настройки напоминаний.",
     "reminder_settings_saved": "Отлично! Ваши настройки напоминаний успешно сохранены.",
-    "reminder_invalid_day": "Неверный день. Выберите из понедельника, вторника и т.д.",
+    "reminder_invalid_day": "Неверный день. Введите день аванса и зарплаты, по типу: \"5,20\"",
     "weekly_report_title": "Еженедельный отчет по долгам",
     "weekly_report_intro": "Вот сводка по вашим долгам за последнюю неделю:",
     "reminder_payday_title": "Напоминание о зарплате",
@@ -137,5 +137,12 @@
     "debt_group_start_bot_first": "Пожалуйста, запустите бота перед использованием этой функции.",
     "onboarding_private_step1": "Шаг 1: Чтобы записать долг, упомяните пользователя через @username, затем сумму и описание.",
     "onboarding_private_step2": "Шаг 2: Используйте /pay для записи платежей и погашения долгов.",
-    "onboarding_private_step3": "Шаг 3: Используйте /settings для настройки предпочтений и доверенных лиц."
+    "onboarding_private_step3": "Шаг 3: Используйте /settings для настройки предпочтений и доверенных лиц.",
+    "onboarding_private_example": "Пример: @friend 500 за фильм",
+    "onboarding_resources": "Полезные ресурсы:",
+    "btn_github": "\ud83d\udd27 GitHub",
+    "TRUSTED_USERS_MENU": "Доверенные пользователи",
+    "TRUSTED_USER_ADD_PROMPT": "Добавить",
+    "TRUSTED_USER_REMOVE_PROMPT": "Удалить",
+    "GENERIC_BACK": "Назад"
 }

@@ -8,7 +8,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from bot.config import get_settings
-from bot.db.connection import get_connection
+from bot.db.connection import get_connection, close_pool
 from bot.core.notification_service import NotificationService
 from bot.middlewares.user_middleware import UserMiddleware
 from bot.middlewares.i18n_middleware import I18nMiddleware
@@ -55,7 +55,7 @@ async def main():
     dp.include_router(profile_router)
     dp.include_router(inline_router)
 
-    scheduler_manager.start()
+    scheduler_manager.start(bot)
 
     logger.info("Starting bot...")
     await bot.delete_webhook(drop_pending_updates=True)
@@ -70,3 +70,4 @@ if __name__ == "__main__":
     finally:
         scheduler_manager.shutdown()
         asyncio.run(db.disconnect()) 
+        asyncio.run(close_pool())
