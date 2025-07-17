@@ -14,14 +14,19 @@ class BotSettings(BaseSettings):
     )
 
     token: str = Field(..., description="Telegram Bot Token from @BotFather")
-    admin_id: int = Field(..., description="Admin's Telegram User ID for special commands")
+    admin_id: int | None = Field(
+        None, description="Admin's Telegram User ID for special commands"
+    )
 
 
 class DatabaseSettings(BaseSettings):
     """Configuration for the database."""
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", env_prefix="DATABASE_", extra="ignore"
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="DATABASE_",
+        extra="ignore",
     )
 
     path: str = Field("budu_dolzhen.db", description="Path to the SQLite database file")
@@ -31,7 +36,10 @@ class SchedulerSettings(BaseSettings):
     """Configuration for the scheduler."""
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", env_prefix="SCHEDULER_", extra="ignore"
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="SCHEDULER_",
+        extra="ignore",
     )
 
     timezone: str = Field("UTC", description="Timezone for scheduler operations")
@@ -40,7 +48,9 @@ class SchedulerSettings(BaseSettings):
 class AppSettings(BaseSettings):
     """General application settings."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     debug: bool = Field(False, description="Enable debug mode for development")
     log_level: str = Field("INFO", description="Logging level")
@@ -48,6 +58,7 @@ class AppSettings(BaseSettings):
     bot: BotSettings = Field(default_factory=BotSettings)
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
+
     @property
     def log_level_value(self) -> int:
         """Return the numeric value of the log level."""
@@ -67,9 +78,6 @@ def get_settings() -> AppSettings:
             log_level="DEBUG",
             bot=BotSettings(token="test_token", admin_id=123),
             db=DatabaseSettings(path=":memory:"),
-            scheduler=SchedulerSettings(timezone="UTC")
+            scheduler=SchedulerSettings(timezone="UTC"),
         )
-    return AppSettings(
-        debug=False,
-        log_level="INFO"
-    )
+    return AppSettings(debug=False, log_level="INFO")

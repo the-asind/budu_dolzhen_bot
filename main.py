@@ -8,19 +8,17 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from bot.config import get_settings
-from bot.db.connection import db
-from bot.handlers import common, debt_handlers, payment_handlers, profile_handlers
+from bot.db.connection import get_connection
 from bot.core.notification_service import NotificationService
 from bot.middlewares.user_middleware import UserMiddleware
 from bot.middlewares.i18n_middleware import I18nMiddleware
 from bot.middlewares.logging_middleware import LoggingMiddleware
 from bot.scheduler.scheduler_manager import scheduler_manager
-from bot.handlers.common import common_router
-from bot.handlers.debt import debt_router
-from bot.handlers.payment import payment_router
-from bot.handlers.profile import profile_router
-from bot.handlers.inline import inline_router
-
+from bot.handlers.common import router as common_router
+from bot.handlers.debt_handlers import router as debt_router
+from bot.handlers.payment_handlers import router as payment_router
+from bot.handlers.profile_handlers import profile_router
+from bot.handlers.inline_handlers import inline_router
 
 async def main():
     """The main function that starts the bot."""
@@ -33,7 +31,8 @@ async def main():
     )
     logger = logging.getLogger(__name__)
 
-    await db.connect()
+    async with get_connection():
+        pass
 
     bot = Bot(
         token=settings.bot.token,

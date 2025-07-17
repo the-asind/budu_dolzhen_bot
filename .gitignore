@@ -129,8 +129,8 @@ dmypy.json
 .cursor
 
 # Environments
-.env.*
-!
+.env*
+!.env.example
 tasks.md
 Project Research Plan.md
 s.sh
