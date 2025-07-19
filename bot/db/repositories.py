@@ -132,10 +132,6 @@ class UserRepository:
                         ),
                     )
                     await conn.execute(
-                        "INSERT OR IGNORE INTO users (user_id, username, first_name, language_code) VALUES (?, ?, ?, ?)",
-                        (user_id, username, first_name, language_code),
-                    )
-                    await conn.execute(
                         "UPDATE debts SET creditor_id = ? WHERE creditor_id = ?",
                         (user_id, existing_username.user_id),
                     )
@@ -155,10 +151,26 @@ class UserRepository:
                         "DELETE FROM users WHERE user_id = ?",
                         (existing_username.user_id,),
                     )
-                    await conn.execute(
-                        "INSERT INTO users (user_id, username, first_name, language_code) VALUES (?, ?, ?, ?)",
-                        (user_id, username, first_name, language_code),
-                    )
+                    try:
+                        await conn.execute(
+                            "INSERT OR IGNORE INTO users (user_id, username, first_name, language_code) VALUES (?, ?, ?, ?)",
+                            (user_id, username, first_name, language_code),
+                        )
+                    except aiosqlite.IntegrityError as exc:
+                        if "users.user_id" in str(exc):
+                            logger.warning(
+                                "User id %d already exists, returning existing record",
+                                user_id,
+                            )
+                            cursor = await conn.execute(
+                                "SELECT * FROM users WHERE user_id = ?",
+                                (user_id,),
+                            )
+                            row = await cursor.fetchone()
+                            if row:
+                                return UserModel(**dict(row))  # type: ignore
+                            raise
+                        raise
                     await conn.execute("PRAGMA foreign_keys = ON")
                     await conn.commit()
 
@@ -169,9 +181,7 @@ class UserRepository:
                     row = await cursor.fetchone()
                     return UserModel(**dict(row))  # type: ignore
             except Exception as e:  # pragma: no cover - transformation logic
-                logger.exception(
-                    "Failed to update placeholder user %s: %s", username, e
-                )
+                logger.exception("Failed to update placeholder user %s: %s", username, e)
                 raise
 
         try:
@@ -213,7 +223,9 @@ class UserRepository:
                     (user_id,),
                 )
                 row = await cursor.fetchone()
-                return UserModel(**dict(row))  # type: ignore
+                if row:
+                    return UserModel(**dict(row))  # type: ignore
+                raise RuntimeError("Failed to retrieve user after insertion")
         except Exception as e:
             logger.exception("Failed to get_or_create user %s: %s", username, e)
             raise
@@ -384,9 +396,7 @@ class DebtRepository:
     """SQLite implementation of debt repository."""
 
     @classmethod
-    async def add(
-        cls, *, creditor_id: int, debtor_id: int, amount: int, description: str
-    ) -> DebtModel:
+    async def add(cls, *, creditor_id: int, debtor_id: int, amount: int, description: str) -> DebtModel:
         """Create a new debt record."""
         try:
             ctx = await _acquire_connection()
@@ -400,9 +410,7 @@ class DebtRepository:
                 )
                 await conn.commit()
                 debt_id = cursor.lastrowid
-                cursor = await conn.execute(
-                    "SELECT * FROM debts WHERE debt_id = ?", (debt_id,)
-                )
+                cursor = await conn.execute("SELECT * FROM debts WHERE debt_id = ?", (debt_id,))
                 row = await cursor.fetchone()
                 return DebtModel(**dict(row))  # type: ignore
         except Exception as e:
@@ -441,9 +449,7 @@ class DebtRepository:
         try:
             ctx = await _acquire_connection()
             async with ctx as conn:
-                cursor = await conn.execute(
-                    "SELECT * FROM debts WHERE debt_id = ?", (debt_id,)
-                )
+                cursor = await conn.execute("SELECT * FROM debts WHERE debt_id = ?", (debt_id,))
                 row = await cursor.fetchone()
                 if row:
                     return DebtModel(**dict(row))  # type: ignore
@@ -465,9 +471,7 @@ class DebtRepository:
                     (status, debt_id),
                 )
                 await conn.commit()
-                cursor = await conn.execute(
-                    "SELECT * FROM debts WHERE debt_id = ?", (debt_id,)
-                )
+                cursor = await conn.execute("SELECT * FROM debts WHERE debt_id = ?", (debt_id,))
                 row = await cursor.fetchone()
                 if row is None:
                     raise ValueError("Debt not found")
@@ -505,9 +509,7 @@ class PaymentRepository:
                 )
                 await conn.commit()
                 payment_id = cursor.lastrowid
-                cursor = await conn.execute(
-                    "SELECT * FROM payments WHERE payment_id = ?", (payment_id,)
-                )
+                cursor = await conn.execute("SELECT * FROM payments WHERE payment_id = ?", (payment_id,))
                 row = await cursor.fetchone()
                 return PaymentModel(**dict(row))  # type: ignore
         except Exception as e:
@@ -550,9 +552,7 @@ class PaymentRepository:
                     (payment_id,),
                 )
                 await conn.commit()
-                cursor = await conn.execute(
-                    "SELECT * FROM payments WHERE payment_id = ?", (payment_id,)
-                )
+                cursor = await conn.execute("SELECT * FROM payments WHERE payment_id = ?", (payment_id,))
                 row = await cursor.fetchone()
                 if row is None:
                     raise ValueError("Payment not found")

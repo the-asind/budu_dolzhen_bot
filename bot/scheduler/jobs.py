@@ -1,6 +1,7 @@
 import logging
 import aiosqlite
 from aiogram import Bot
+
 from datetime import datetime, timedelta, timezone, date
 
 from ..config import get_settings
@@ -9,20 +10,22 @@ from ..core.notification_service import NotificationService
 logger = logging.getLogger(__name__)
 
 
-async def send_weekly_reports(bot: Bot):
+async def send_weekly_reports(bot: Bot | None = None):
     """
     Job to send weekly debt summary reports to all users.
     """
     logger.info("Executing job: send_weekly_reports")
     settings = get_settings()
+    created = False
+    if bot is None:
+        bot = Bot(settings.bot.token)
+        created = True
     db_path = settings.db.path
     notif = NotificationService(bot)
     try:
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
-            users_cursor = await db.execute(
-                "SELECT user_id, username FROM users WHERE reminder_enabled = 1"
-            )
+            users_cursor = await db.execute("SELECT user_id, username FROM users WHERE reminder_enabled = 1")
             users = await users_cursor.fetchall()
 
             for user in users:
@@ -55,14 +58,21 @@ async def send_weekly_reports(bot: Bot):
         logger.info("Weekly reports job completed successfully.")
     except Exception as e:
         logger.error(f"Error in send_weekly_reports job: {e}")
+    finally:
+        if created:
+            await bot.session.close()
 
 
-async def check_confirmation_timeouts(bot: Bot):
+async def check_confirmation_timeouts(bot: Bot | None = None):
     """
     Job to reject pending debts that have exceeded the confirmation timeout.
     """
     logger.info("Executing job: check_confirmation_timeouts")
     settings = get_settings()
+    created = False
+    if bot is None:
+        bot = Bot(settings.bot.token)
+        created = True
     db_path = settings.db.path
     now_utc = datetime.now(timezone.utc)
     cutoff = now_utc - timedelta(hours=23)
@@ -71,8 +81,7 @@ async def check_confirmation_timeouts(bot: Bot):
             db.row_factory = aiosqlite.Row
             # select debts pending before cutoff
             cursor = await db.execute(
-                "SELECT debt_id, creditor_id, debtor_id FROM debts "
-                "WHERE status = 'pending' AND created_at < ?",
+                "SELECT debt_id, creditor_id, debtor_id FROM debts " "WHERE status = 'pending' AND created_at < ?",
                 (cutoff.isoformat(),),
             )
             expired = await cursor.fetchall()
@@ -116,14 +125,21 @@ async def check_confirmation_timeouts(bot: Bot):
         logger.info("Confirmation timeout check completed.")
     except Exception as e:
         logger.error(f"Error in check_confirmation_timeouts job: {e}")
+    finally:
+        if created:
+            await bot.session.close()
 
 
-async def send_payday_reminders(bot: Bot):
+async def send_payday_reminders(bot: Bot | None = None):
     """
     Job to send payday reminders to users based on their payday_days setting.
     """
     logger.info("Executing job: send_payday_reminders")
     settings = get_settings()
+    created = False
+    if bot is None:
+        bot = Bot(settings.bot.token)
+        created = True
     db_path = settings.db.path
     today_day = date.today().day
     try:
@@ -149,7 +165,7 @@ async def send_payday_reminders(bot: Bot):
                         continue
                 except Exception:
                     logger.warning(f"Invalid payday_days format for user {user_id}: '{raw}'")
-                    continue                
+                    continue
                 if today_day in days:
                     text = (
                         "💰 Payday Reminder 💰\n\n"
@@ -164,3 +180,6 @@ async def send_payday_reminders(bot: Bot):
         logger.info("Payday reminders job completed.")
     except Exception as e:
         logger.error(f"Error in send_payday_reminders job: {e}")
+    finally:
+        if created:
+            await bot.session.close()

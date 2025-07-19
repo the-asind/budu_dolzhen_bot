@@ -46,9 +46,7 @@ class SchedulerManager:
 
         jobstores = {"default": SQLAlchemyJobStore(url=f"sqlite:///{db_path}")}
 
-        self._scheduler = AsyncIOScheduler(
-            jobstores=jobstores, timezone=timezone(settings.scheduler.timezone)
-        )
+        self._scheduler = AsyncIOScheduler(jobstores=jobstores, timezone=timezone(settings.scheduler.timezone))
 
     def start(self, bot: Bot | None = None) -> None:
         """Start the scheduler and register jobs.
@@ -66,14 +64,12 @@ class SchedulerManager:
                 jobs.check_confirmation_timeouts,
                 "interval",
                 hours=1,
-                kwargs={"bot": bot},
             )
             self._scheduler.add_job(
                 jobs.send_weekly_reports,
                 "cron",
                 day_of_week="mon",
                 hour=10,
-                kwargs={"bot": bot},
             )
 
             self._scheduler.start()
