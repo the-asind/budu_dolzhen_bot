@@ -69,5 +69,4 @@ if __name__ == "__main__":
         logging.info("Bot stopped.")
     finally:
         scheduler_manager.shutdown()
-        asyncio.run(db.disconnect()) 
         asyncio.run(close_pool())

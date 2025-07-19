@@ -21,7 +21,7 @@ async def handle_start_command(message: Message, _: Callable):
     if not user:
         return
 
-    db_user = await user_repo.get_or_create_user(
+    await user_repo.get_or_create_user(
         user_id=user.id,
         username=user.username or f"user_{user.id}",
         first_name=user.first_name or (user.username or str(user.id)),
@@ -43,9 +43,7 @@ async def handle_start_command(message: Message, _: Callable):
     else:
         # Group chat onboarding: concise overview and privacy notice in a single message
         group_onboarding_text = (
-            f"{_('start_welcome_group')}\n\n"
-            f"{_('onboarding_group_step1')}\n\n"
-            f"{_('onboarding_group_step2')}"
+            f"{_('start_welcome_group')}\n\n" f"{_('onboarding_group_step1')}\n\n" f"{_('onboarding_group_step2')}"
         )
         await message.answer(group_onboarding_text)
 

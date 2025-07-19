@@ -5,7 +5,7 @@ import pytest_asyncio
 from unittest.mock import patch
 
 from bot.core import DebtManager
-from bot.db.repositories import UserRepository, DebtRepository
+from bot.db.repositories import UserRepository
 from bot.db import connection
 
 AUTHOR_USERNAME = "creditor"
@@ -14,7 +14,7 @@ AUTHOR_USERNAME = "creditor"
 @pytest_asyncio.fixture
 async def db_setup():
     """Create in-memory SQLite database for tests."""
-    with patch.object(connection, 'DATABASE_PATH', ':memory:'):
+    with patch.object(connection, "DATABASE_PATH", ":memory:"):
         # Reset pool to ensure new in-memory db is used
         connection._pool = None
         connection._pool_initialized = False
@@ -37,7 +37,7 @@ async def test_process_message_creates_debts() -> None:
 
     assert len(debts) == 2
     amounts = sorted(d.amount for d in debts)
-    assert amounts == [250, 500]
+    assert amounts == [25000, 50000]
 
 
 @pytest.mark.usefixtures("db_setup")
@@ -53,5 +53,5 @@ async def test_existing_users_reused() -> None:
 
     assert debt.creditor_id == author.user_id
     assert debt.debtor_id == debtor.user_id
-    assert debt.amount == 100
-    assert debt.status == "pending" 
+    assert debt.amount == 10000
+    assert debt.status == "pending"

@@ -15,24 +15,27 @@ def author():
     "message, expected",
     [
         # Simple case: one debtor, integer amount
-        ("@user1 1230 обед", {"user1": (1230, "обед")}),
+        ("@user1 1230 обед", {"user1": (123000, "обед")}),
         # Multiple debtors, same amount
-        ("@user1 @user2 300", {"user1": (300, ""), "user2": (300, "")}),
+        ("@user1 @user2 300", {"user1": (30000, ""), "user2": (30000, "")}),
         # Simple arithmetic expression
-        ("@user3 500+200 ужин", {"user3": (700, "ужин")}),
+        ("@user3 500+200 ужин", {"user3": (70000, "ужин")}),
         # Division expression
-        ("@user4 3000/3", {"user4": (1000, "")}),
+        ("@user4 3000/3", {"user4": (100000, "")}),
         # 'я' keyword for splitting
-        ("я @user1 @user2 3000/3 торт", {"user1": (1000, "торт"), "user2": (1000, "торт")}),
+        (
+            "я @user1 @user2 3000/3 торт",
+            {"user1": (100000, "торт"), "user2": (100000, "торт")},
+        ),
         # Aggregation across lines
         (
             "@user1 100 обед\n@user1 50 чай",
-            {"user1": (150, "обед, чай")},
+            {"user1": (15000, "обед, чай")},
         ),
         # Complex aggregation
         (
             "@user1 1230 обед\nя @user1 @user2 3000/3 торт",
-            {"user1": (2230, "обед, торт"), "user2": (1000, "торт")},
+            {"user1": (223000, "обед, торт"), "user2": (100000, "торт")},
         ),
     ],
     ids=[
@@ -82,4 +85,8 @@ def test_debt_parser_error_path(message, error_message, author):
     with pytest.raises(DebtParseError, match=error_message):
         DebtParser.parse(message, author)
 
-# endregion 
+def test_username_case_insensitive(author):
+    result = DebtParser.parse("@UserX 100", author)
+    assert "userx" in result
+    
+# endregion

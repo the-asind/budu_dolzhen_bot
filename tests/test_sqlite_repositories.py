@@ -672,6 +672,14 @@ class TestUserRepository:
         assert retrieved_user.username == "testuser"
         assert retrieved_user.user_id == created_user.user_id
 
+    async def test_get_by_username_case_insensitive(self, initialized_db):
+        """User lookup should be case-insensitive."""
+        created_user = await UserRepository.add("CaseUser")
+        retrieved = await UserRepository.get_by_username("caseuser")
+
+        assert retrieved is not None
+        assert retrieved.user_id == created_user.user_id
+
     async def test_get_by_username_nonexistent_user(self, initialized_db):
         """Test retrieving nonexistent user by username."""
         user = await UserRepository.get_by_username("nonexistent")
@@ -1380,7 +1388,7 @@ class TestErrorHandling:
 
         # Should not cause SQL injection
         user = await UserRepository.add(malicious_username)
-        assert user.username == malicious_username
+        assert user.username == malicious_username.lower()
 
         # Verify users table still exists
         async with get_connection() as conn:

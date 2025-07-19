@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from bot.locales.main import Localization
 import json
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 
 def encode_callback_data(action: str, debt_id: int, **kwargs) -> str:

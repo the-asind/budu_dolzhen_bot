@@ -3,10 +3,11 @@ from aiogram import Bot, Router, F
 from aiogram.types import Message
 
 from ..core.debt_manager import DebtManager
-from ..core.debt_parser import DebtParser
 from ..core.notification_service import NotificationService
+from ..db.repositories import UserRepository
 
 router = Router()
+user_repo = UserRepository()
 
 
 @router.message(F.text & F.text.startswith("@"))
@@ -36,7 +37,9 @@ async def handle_debt_message(
             return
 
         try:
-            await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+            await bot.delete_message(
+                chat_id=message.chat.id, message_id=message.message_id
+            )
         except Exception:
             pass
 
@@ -48,7 +51,7 @@ async def handle_debt_message(
         except Exception:
             await message.reply(_("debt_group_start_bot_first"))
         return
-    
+
     text = message.text.strip()
 
     debt_manager = DebtManager()
@@ -60,5 +63,14 @@ async def handle_debt_message(
 
     if result:
         await message.reply(_("debts_registered"))
+        creditor = await user_repo.get_by_username(
+            (message.from_user.username or "").lower()
+        )
+        for debt in result:
+            debtor = await user_repo.get_by_id(debt.debtor_id)
+            if debtor and creditor:
+                await notification_service.send_debt_confirmation_request(
+                    debt, creditor, debtor
+                )
     else:
         await message.reply(_("error_in_message"))

@@ -88,7 +88,7 @@ class DebtParser:
 
             username = ntok[1:]  # strip @
             try:
-                validate_username(username)
+                username = validate_username(ntok)
             except ValueError as exc:
                 raise DebtParseError(str(exc)) from exc
 
@@ -124,8 +124,8 @@ class DebtParser:
         if amount_value_float <= 0:
             raise DebtParseError("Amount must be positive.")
 
-        # Convert to int with half-up rounding for fractional results
-        share_int = int(amount_value_float + 0.5)
+        # Convert to cents with half-up rounding for fractional results
+        share_int = int(amount_value_float * 100 + 0.5)
 
         comment = " ".join(tokens[i:]).strip()
 
