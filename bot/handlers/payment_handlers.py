@@ -1,4 +1,5 @@
 import re
+import html
 from decimal import Decimal
 from typing import Callable
 
@@ -23,7 +24,12 @@ async def handle_pay_command(message: Message, _: Callable) -> None:
 
     match = PAY_COMMAND_RE.match(message.text)
     if not match:
-        await message.reply(_("invalid_pay_command_format", command=html.escape("/pay <ID долга> <сумма>")))
+        await message.reply(
+            _(
+                "invalid_pay_command_format",
+                command=html.escape("/pay <ID долга> <сумма>"),
+            )
+        )
         return
 
     debt_id_str, amount_str = match.groups()
@@ -31,7 +37,9 @@ async def handle_pay_command(message: Message, _: Callable) -> None:
     amount_in_cents = int(Decimal(amount_str.replace(",", ".")) * 100)
 
     try:
-        await payment_manager.process_payment(debt_id=debt_id, amount_in_cents=amount_in_cents)
+        await payment_manager.process_payment(
+            debt_id=debt_id, amount_in_cents=amount_in_cents
+        )
     except Exception as exc:  # noqa: BLE001 - surface error to user
         await message.reply(_("payment_processing_error", reason=str(exc)))
         return

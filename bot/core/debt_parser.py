@@ -89,6 +89,7 @@ class DebtParser:
             username = ntok[1:]  # strip @
             try:
                 username = validate_username(ntok)
+                username = username.lower()
             except ValueError as exc:
                 raise DebtParseError(str(exc)) from exc
 

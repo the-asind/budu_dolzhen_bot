@@ -35,3 +35,4 @@ async def test_pay_command_invalid_format(model_message):
     msg.reply = AsyncMock()
     await handle_pay_command(msg, lambda key, **kwargs: key)
     msg.reply.assert_called_once_with("invalid_pay_command_format")
+
