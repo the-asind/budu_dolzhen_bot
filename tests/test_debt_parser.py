@@ -55,20 +55,22 @@ def test_debt_parser_happy_path(message, expected, author):
         assert result[user].amount == amount
         assert result[user].combined_comment == comment
 
+
 # endregion
+
 
 # region Error Path Tests
 @pytest.mark.parametrize(
     "message, error_message",
     [
-        ("some random text", "No user mentions found."),
-        ("@user1", "Amount not found."),
-        ("@user1+@user2 100", "Invalid Telegram username format"),
-        ("@user1 100/0", "Division by zero"),
-        ("@usr 100", "Invalid Telegram username format"),
-        ("@user1 0", "Amount must be positive."),
-        ("@user1 -50", "Amount must be positive."),
-        ("@user1 @user1 100", "Duplicate user mention"),
+        ("some random text", "parser_no_mentions"),
+        ("@user1", "parser_amount_not_found"),
+        ("@user1+@user2 100", "invalid_username_format"),
+        ("@user1 100/0", "parser_division_by_zero"),
+        ("@usr 100", "invalid_username_format"),
+        ("@user1 0", "parser_amount_positive"),
+        ("@user1 -50", "parser_amount_positive"),
+        ("@user1 @user1 100", "parser_duplicate_mention"),
     ],
     ids=[
         "no-user-mentions",
@@ -85,8 +87,10 @@ def test_debt_parser_error_path(message, error_message, author):
     with pytest.raises(DebtParseError, match=error_message):
         DebtParser.parse(message, author)
 
+
 def test_username_case_insensitive(author):
     result = DebtParser.parse("@UserX 100", author)
     assert "userx" in result
-    
+
+
 # endregion

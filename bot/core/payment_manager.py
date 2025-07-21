@@ -1,7 +1,7 @@
 from typing import List
 
 from ..db.repositories import DebtRepository, PaymentRepository
-from ..db.models import Payment as PaymentModel, Debt as DebtModel
+from ..db.models import Payment as PaymentModel
 
 
 class PaymentManager:
@@ -11,11 +11,7 @@ class PaymentManager:
         self._payment_repo = PaymentRepository()
         self._debt_repo = DebtRepository()
 
-    async def process_payment(
-        self,
-        debt_id: int,
-        amount_in_cents: int
-    ) -> PaymentModel:
+    async def process_payment(self, debt_id: int, amount_in_cents: int) -> PaymentModel:
         """
         Processes a payment for a given debt.
 
@@ -35,35 +31,29 @@ class PaymentManager:
             ValueError: If validation fails.
         """
         if amount_in_cents <= 0:
-            raise ValueError("Payment amount must be positive")
+            raise ValueError("payment_amount_positive")
 
         debt = await self._debt_repo.get(debt_id)
         if debt is None:
-            raise ValueError(f"Debt with id {debt_id} not found")
+            raise ValueError("payment_debt_not_found")
         if debt.status != "active":
-            raise ValueError(
-                f"Cannot make payment on debt {debt_id} with status '{debt.status}'"
-            )
+            raise ValueError("payment_invalid_status")
 
         existing_payments = await self._payment_repo.get_by_debt(debt_id)
-        total_confirmed = sum(p.amount for p in existing_payments if p.status == "confirmed")
+        total_confirmed = sum(
+            p.amount for p in existing_payments if p.status == "confirmed"
+        )
         remaining = debt.amount - total_confirmed
         if amount_in_cents > remaining:
-            raise ValueError(
-                f"Payment amount {amount_in_cents} exceeds remaining debt {remaining}"
-            )
+            raise ValueError("payment_exceeds_remaining")
 
         payment = await self._payment_repo.create_payment(
-            debt_id=debt_id,
-            amount=amount_in_cents
+            debt_id=debt_id, amount=amount_in_cents
         )
 
         return payment
 
-    async def confirm_payment(
-        self,
-        payment_id: int
-    ) -> PaymentModel:
+    async def confirm_payment(self, payment_id: int) -> PaymentModel:
         """
         Confirms a pending payment, updates its status, and updates debt status if settled.
 
@@ -83,12 +73,12 @@ class PaymentManager:
         # Confirm the payment
         payment = await self._payment_repo.confirm_payment(payment_id)
         if payment is None:
-            raise ValueError(f"Payment with id {payment_id} not found")
+            raise ValueError("payment_not_found")
 
         # Retrieve associated debt
         debt = await self._debt_repo.get(payment.debt_id)
         if debt is None:
-            raise ValueError(f"Debt with id {payment.debt_id} not found")
+            raise ValueError("payment_debt_not_found")
 
         # Sum confirmed payments
         all_payments = await self._payment_repo.get_by_debt(debt.debt_id)
@@ -102,10 +92,7 @@ class PaymentManager:
 
         return payment
 
-    async def get_payment_history(
-        self,
-        debt_id: int
-    ) -> List[PaymentModel]:
+    async def get_payment_history(self, debt_id: int) -> List[PaymentModel]:
         """
         Retrieves the payment history for a given debt.
 

@@ -59,10 +59,14 @@ class TestPaymentAmountValidation:
     @pytest.mark.asyncio
     async def test_valid_payment_amount(self, payment_manager, active_debt):
         """Test processing a valid payment amount."""
-        with patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[]), \
-             patch.object(payment_manager._payment_repo, 'create_payment') as mock_create:
-            
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo, "get_by_debt", return_value=[]
+        ), patch.object(
+            payment_manager._payment_repo, "create_payment"
+        ) as mock_create:
+
             mock_create.return_value = PaymentModel(
                 payment_id=1,
                 debt_id=1,
@@ -70,12 +74,11 @@ class TestPaymentAmountValidation:
                 status="pending_confirmation",
                 created_at=DATETIME_2024,
             )
-            
+
             result = await payment_manager.process_payment(
-                debt_id=1,
-                amount_in_cents=25000
+                debt_id=1, amount_in_cents=25000
             )
-            
+
             assert result.amount == 25000
             assert result.status == "pending_confirmation"
             mock_create.assert_called_once_with(debt_id=1, amount=25000)
@@ -90,14 +93,18 @@ class TestPaymentAmountValidation:
             status="confirmed",
             created_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[existing_payment]):
-            
-            with pytest.raises(ValueError, match="exceeds remaining debt"):
+
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo,
+            "get_by_debt",
+            return_value=[existing_payment],
+        ):
+
+            with pytest.raises(ValueError, match="payment_exceeds_remaining"):
                 await payment_manager.process_payment(
-                    debt_id=1,
-                    amount_in_cents=25000  # Would exceed remaining $200
+                    debt_id=1, amount_in_cents=25000  # Would exceed remaining $200
                 )
 
     @pytest.mark.asyncio
@@ -110,11 +117,17 @@ class TestPaymentAmountValidation:
             status="confirmed",
             created_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[existing_payment]), \
-             patch.object(payment_manager._payment_repo, 'create_payment') as mock_create:
-            
+
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo,
+            "get_by_debt",
+            return_value=[existing_payment],
+        ), patch.object(
+            payment_manager._payment_repo, "create_payment"
+        ) as mock_create:
+
             mock_create.return_value = PaymentModel(
                 payment_id=2,
                 debt_id=1,
@@ -122,42 +135,32 @@ class TestPaymentAmountValidation:
                 status="pending_confirmation",
                 created_at=DATETIME_2024,
             )
-            
+
             result = await payment_manager.process_payment(
-                debt_id=1,
-                amount_in_cents=20000  # Exact remaining amount
+                debt_id=1, amount_in_cents=20000  # Exact remaining amount
             )
-            
+
             assert result.amount == 20000
             mock_create.assert_called_once_with(debt_id=1, amount=20000)
 
     @pytest.mark.asyncio
     async def test_zero_amount_payment_rejection(self, payment_manager):
         """Test rejection of zero amount payments."""
-        with pytest.raises(ValueError, match="Payment amount must be positive"):
-            await payment_manager.process_payment(
-                debt_id=1,
-                amount_in_cents=0
-            )
+        with pytest.raises(ValueError, match="payment_amount_positive"):
+            await payment_manager.process_payment(debt_id=1, amount_in_cents=0)
 
     @pytest.mark.asyncio
     async def test_negative_amount_payment_rejection(self, payment_manager):
         """Test rejection of negative amount payments."""
-        with pytest.raises(ValueError, match="Payment amount must be positive"):
-            await payment_manager.process_payment(
-                debt_id=1,
-                amount_in_cents=-1000
-            )
+        with pytest.raises(ValueError, match="payment_amount_positive"):
+            await payment_manager.process_payment(debt_id=1, amount_in_cents=-1000)
 
     @pytest.mark.asyncio
     async def test_payment_on_nonexistent_debt(self, payment_manager):
         """Test payment attempt on non-existent debt."""
-        with patch.object(payment_manager._debt_repo, 'get', return_value=None):
-            with pytest.raises(ValueError, match="Debt with id 999 not found"):
-                await payment_manager.process_payment(
-                    debt_id=999,
-                    amount_in_cents=1000
-                )
+        with patch.object(payment_manager._debt_repo, "get", return_value=None):
+            with pytest.raises(ValueError, match="payment_debt_not_found"):
+                await payment_manager.process_payment(debt_id=999, amount_in_cents=1000)
 
     @pytest.mark.asyncio
     async def test_payment_on_inactive_debt(self, payment_manager):
@@ -171,13 +174,12 @@ class TestPaymentAmountValidation:
             status="paid",
             created_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._debt_repo, 'get', return_value=inactive_debt):
-            with pytest.raises(ValueError, match="Cannot make payment on debt 1 with status 'paid'"):
-                await payment_manager.process_payment(
-                    debt_id=1,
-                    amount_in_cents=1000
-                )
+
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=inactive_debt
+        ):
+            with pytest.raises(ValueError, match="payment_invalid_status"):
+                await payment_manager.process_payment(debt_id=1, amount_in_cents=1000)
 
 
 class TestTwoSidedConfirmationWorkflow:
@@ -193,7 +195,7 @@ class TestTwoSidedConfirmationWorkflow:
             status="pending_confirmation",
             created_at=DATETIME_2024,
         )
-        
+
         confirmed_payment = PaymentModel(
             payment_id=1,
             debt_id=1,
@@ -202,20 +204,33 @@ class TestTwoSidedConfirmationWorkflow:
             created_at=DATETIME_2024,
             confirmed_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._payment_repo, 'confirm_payment', return_value=confirmed_payment), \
-             patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[confirmed_payment]), \
-             patch.object(payment_manager._debt_repo, 'update_status') as mock_update:
-            
+
+        with patch.object(
+            payment_manager._payment_repo,
+            "confirm_payment",
+            return_value=confirmed_payment,
+        ), patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo,
+            "get_by_debt",
+            return_value=[confirmed_payment],
+        ), patch.object(
+            payment_manager._debt_repo, "update_status"
+        ) as mock_update:
+
             result = await payment_manager.confirm_payment(payment_id=1)
-            
+
             assert result.status == "confirmed"
             assert result.confirmed_at is not None
-            mock_update.assert_called_once_with(1, "active")  # Debt remains active (partial payment)
+            mock_update.assert_called_once_with(
+                1, "active"
+            )  # Debt remains active (partial payment)
 
     @pytest.mark.asyncio
-    async def test_payment_confirmation_completes_debt(self, payment_manager, active_debt):
+    async def test_payment_confirmation_completes_debt(
+        self, payment_manager, active_debt
+    ):
         """Test payment confirmation that completes the debt."""
         confirmed_payment = PaymentModel(
             payment_id=1,
@@ -225,22 +240,33 @@ class TestTwoSidedConfirmationWorkflow:
             created_at=DATETIME_2024,
             confirmed_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._payment_repo, 'confirm_payment', return_value=confirmed_payment), \
-             patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[confirmed_payment]), \
-             patch.object(payment_manager._debt_repo, 'update_status') as mock_update:
-            
+
+        with patch.object(
+            payment_manager._payment_repo,
+            "confirm_payment",
+            return_value=confirmed_payment,
+        ), patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo,
+            "get_by_debt",
+            return_value=[confirmed_payment],
+        ), patch.object(
+            payment_manager._debt_repo, "update_status"
+        ) as mock_update:
+
             result = await payment_manager.confirm_payment(payment_id=1)
-            
+
             assert result.status == "confirmed"
             mock_update.assert_called_once_with(1, "paid")  # Debt marked as paid
 
     @pytest.mark.asyncio
     async def test_confirmation_of_nonexistent_payment(self, payment_manager):
         """Test confirmation attempt on non-existent payment."""
-        with patch.object(payment_manager._payment_repo, 'confirm_payment', return_value=None):
-            with pytest.raises(ValueError, match="Payment with id 999 not found"):
+        with patch.object(
+            payment_manager._payment_repo, "confirm_payment", return_value=None
+        ):
+            with pytest.raises(ValueError, match="payment_not_found"):
                 await payment_manager.confirm_payment(payment_id=999)
 
     @pytest.mark.asyncio
@@ -253,11 +279,14 @@ class TestTwoSidedConfirmationWorkflow:
             status="confirmed",
             created_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._payment_repo, 'confirm_payment', return_value=confirmed_payment), \
-             patch.object(payment_manager._debt_repo, 'get', return_value=None):
-            
-            with pytest.raises(ValueError, match="Debt with id 999 not found"):
+
+        with patch.object(
+            payment_manager._payment_repo,
+            "confirm_payment",
+            return_value=confirmed_payment,
+        ), patch.object(payment_manager._debt_repo, "get", return_value=None):
+
+            with pytest.raises(ValueError, match="payment_debt_not_found"):
                 await payment_manager.confirm_payment(payment_id=1)
 
 
@@ -267,10 +296,14 @@ class TestPartialPaymentScenarios:
     @pytest.mark.asyncio
     async def test_single_partial_payment(self, payment_manager, active_debt):
         """Test processing a single partial payment."""
-        with patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[]), \
-             patch.object(payment_manager._payment_repo, 'create_payment') as mock_create:
-            
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo, "get_by_debt", return_value=[]
+        ), patch.object(
+            payment_manager._payment_repo, "create_payment"
+        ) as mock_create:
+
             mock_create.return_value = PaymentModel(
                 payment_id=1,
                 debt_id=1,
@@ -278,12 +311,11 @@ class TestPartialPaymentScenarios:
                 status="pending_confirmation",
                 created_at=DATETIME_2024,
             )
-            
+
             result = await payment_manager.process_payment(
-                debt_id=1,
-                amount_in_cents=15000
+                debt_id=1, amount_in_cents=15000
             )
-            
+
             assert result.amount == 15000
             assert result.status == "pending_confirmation"
 
@@ -306,11 +338,15 @@ class TestPartialPaymentScenarios:
                 created_at=DATETIME_2024,
             ),
         ]
-        
-        with patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=existing_payments), \
-             patch.object(payment_manager._payment_repo, 'create_payment') as mock_create:
-            
+
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo, "get_by_debt", return_value=existing_payments
+        ), patch.object(
+            payment_manager._payment_repo, "create_payment"
+        ) as mock_create:
+
             mock_create.return_value = PaymentModel(
                 payment_id=3,
                 debt_id=1,
@@ -318,16 +354,17 @@ class TestPartialPaymentScenarios:
                 status="pending_confirmation",
                 created_at=DATETIME_2024,
             )
-            
+
             result = await payment_manager.process_payment(
-                debt_id=1,
-                amount_in_cents=20000
+                debt_id=1, amount_in_cents=20000
             )
-            
+
             assert result.amount == 20000
 
     @pytest.mark.asyncio
-    async def test_partial_payment_with_pending_payments(self, payment_manager, active_debt):
+    async def test_partial_payment_with_pending_payments(
+        self, payment_manager, active_debt
+    ):
         """Test partial payment calculation ignoring pending payments."""
         existing_payments = [
             PaymentModel(
@@ -345,11 +382,15 @@ class TestPartialPaymentScenarios:
                 created_at=DATETIME_2024,
             ),
         ]
-        
-        with patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=existing_payments), \
-             patch.object(payment_manager._payment_repo, 'create_payment') as mock_create:
-            
+
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo, "get_by_debt", return_value=existing_payments
+        ), patch.object(
+            payment_manager._payment_repo, "create_payment"
+        ) as mock_create:
+
             mock_create.return_value = PaymentModel(
                 payment_id=3,
                 debt_id=1,
@@ -357,16 +398,17 @@ class TestPartialPaymentScenarios:
                 status="pending_confirmation",
                 created_at=DATETIME_2024,
             )
-            
+
             result = await payment_manager.process_payment(
-                debt_id=1,
-                amount_in_cents=35000
+                debt_id=1, amount_in_cents=35000
             )
-            
+
             assert result.amount == 35000
 
     @pytest.mark.asyncio
-    async def test_debt_completion_with_multiple_payments(self, payment_manager, active_debt):
+    async def test_debt_completion_with_multiple_payments(
+        self, payment_manager, active_debt
+    ):
         """Test debt completion through multiple confirmed payments."""
         all_payments = [
             PaymentModel(
@@ -384,7 +426,7 @@ class TestPartialPaymentScenarios:
                 created_at=DATETIME_2024,
             ),
         ]
-        
+
         confirmed_payment = PaymentModel(
             payment_id=2,
             debt_id=1,
@@ -392,14 +434,21 @@ class TestPartialPaymentScenarios:
             status="confirmed",
             created_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._payment_repo, 'confirm_payment', return_value=confirmed_payment), \
-             patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=all_payments), \
-             patch.object(payment_manager._debt_repo, 'update_status') as mock_update:
-            
+
+        with patch.object(
+            payment_manager._payment_repo,
+            "confirm_payment",
+            return_value=confirmed_payment,
+        ), patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo, "get_by_debt", return_value=all_payments
+        ), patch.object(
+            payment_manager._debt_repo, "update_status"
+        ) as mock_update:
+
             await payment_manager.confirm_payment(payment_id=2)
-            
+
             mock_update.assert_called_once_with(1, "paid")
 
 
@@ -435,10 +484,10 @@ class TestMutualDebtOffsetting:
         """Test detection of mutual debts between users."""
         # This would be implemented in a future DebtOffsettingManager
         # For now, we test the concept through payment scenarios
-        
+
         debt_a_to_b = bidirectional_debts["a_owes_b"]
         debt_b_to_a = bidirectional_debts["b_owes_a"]
-        
+
         # Net result: A owes B $100 ($300 - $200)
         net_amount = debt_a_to_b.amount - debt_b_to_a.amount
         assert net_amount == 10000  # $100 in cents
@@ -448,16 +497,16 @@ class TestMutualDebtOffsetting:
         """Test calculation of offsetting amounts."""
         debt_a_to_b = bidirectional_debts["a_owes_b"]
         debt_b_to_a = bidirectional_debts["b_owes_a"]
-        
+
         # Calculate offsetting
         smaller_amount = min(debt_a_to_b.amount, debt_b_to_a.amount)
         assert smaller_amount == 20000  # $200 can be offset
-        
+
         remaining_a_to_b = debt_a_to_b.amount - smaller_amount
         remaining_b_to_a = debt_b_to_a.amount - smaller_amount
-        
+
         assert remaining_a_to_b == 10000  # A still owes B $100
-        assert remaining_b_to_a == 0      # B owes A nothing
+        assert remaining_b_to_a == 0  # B owes A nothing
 
     @pytest.mark.asyncio
     async def test_equal_mutual_debts_cancellation(self):
@@ -471,7 +520,7 @@ class TestMutualDebtOffsetting:
             status="active",
             created_at=DATETIME_2024,
         )
-        
+
         debt_b_to_a = DebtModel(
             debt_id=2,
             creditor_id=200,
@@ -481,7 +530,7 @@ class TestMutualDebtOffsetting:
             status="active",
             created_at=DATETIME_2024,
         )
-        
+
         # Both debts should cancel out completely
         net_amount = debt_a_to_b.amount - debt_b_to_a.amount
         assert net_amount == 0
@@ -509,10 +558,12 @@ class TestPaymentHistoryTracking:
                 created_at=DATETIME_2024,
             ),
         ]
-        
-        with patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=payment_history):
+
+        with patch.object(
+            payment_manager._payment_repo, "get_by_debt", return_value=payment_history
+        ):
             result = await payment_manager.get_payment_history(debt_id=1)
-            
+
             assert len(result) == 2
             assert result[0].amount == 15000
             assert result[1].amount == 10000
@@ -520,9 +571,11 @@ class TestPaymentHistoryTracking:
     @pytest.mark.asyncio
     async def test_empty_payment_history(self, payment_manager):
         """Test retrieval of empty payment history."""
-        with patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[]):
+        with patch.object(
+            payment_manager._payment_repo, "get_by_debt", return_value=[]
+        ):
             result = await payment_manager.get_payment_history(debt_id=1)
-            
+
             assert len(result) == 0
             assert result == []
 
@@ -537,10 +590,14 @@ class TestPaymentHistoryTracking:
             created_at=DATETIME_2024,
             confirmed_at=DATETIME_2024_LATER,
         )
-        
-        with patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[payment_with_timestamps]):
+
+        with patch.object(
+            payment_manager._payment_repo,
+            "get_by_debt",
+            return_value=[payment_with_timestamps],
+        ):
             result = await payment_manager.get_payment_history(debt_id=1)
-            
+
             assert len(result) == 1
             payment = result[0]
             assert payment.created_at is not None
@@ -562,14 +619,23 @@ class TestPaymentStatusTransitions:
             created_at=DATETIME_2024,
             confirmed_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._payment_repo, 'confirm_payment', return_value=confirmed_payment), \
-             patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[confirmed_payment]), \
-             patch.object(payment_manager._debt_repo, 'update_status'):
-            
+
+        with patch.object(
+            payment_manager._payment_repo,
+            "confirm_payment",
+            return_value=confirmed_payment,
+        ), patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo,
+            "get_by_debt",
+            return_value=[confirmed_payment],
+        ), patch.object(
+            payment_manager._debt_repo, "update_status"
+        ):
+
             result = await payment_manager.confirm_payment(payment_id=1)
-            
+
             assert result.status == "confirmed"
             assert result.confirmed_at is not None
 
@@ -583,16 +649,21 @@ class TestPaymentStatusTransitions:
             status="pending_confirmation",
             created_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[]), \
-             patch.object(payment_manager._payment_repo, 'create_payment', return_value=pending_payment):
-            
+
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo, "get_by_debt", return_value=[]
+        ), patch.object(
+            payment_manager._payment_repo,
+            "create_payment",
+            return_value=pending_payment,
+        ):
+
             result = await payment_manager.process_payment(
-                debt_id=1,
-                amount_in_cents=25000
+                debt_id=1, amount_in_cents=25000
             )
-            
+
             assert result.status == "pending_confirmation"
             assert result.confirmed_at is None
 
@@ -603,10 +674,14 @@ class TestPaymentIntegration:
     @pytest.mark.asyncio
     async def test_repository_integration(self, payment_manager, active_debt):
         """Test proper integration with repository methods."""
-        with patch.object(payment_manager._debt_repo, 'get') as mock_debt_get, \
-             patch.object(payment_manager._payment_repo, 'get_by_debt') as mock_payment_get, \
-             patch.object(payment_manager._payment_repo, 'create_payment') as mock_payment_create:
-            
+        with patch.object(
+            payment_manager._debt_repo, "get"
+        ) as mock_debt_get, patch.object(
+            payment_manager._payment_repo, "get_by_debt"
+        ) as mock_payment_get, patch.object(
+            payment_manager._payment_repo, "create_payment"
+        ) as mock_payment_create:
+
             mock_debt_get.return_value = active_debt
             mock_payment_get.return_value = []
             mock_payment_create.return_value = PaymentModel(
@@ -616,9 +691,9 @@ class TestPaymentIntegration:
                 status="pending_confirmation",
                 created_at=DATETIME_2024,
             )
-            
+
             await payment_manager.process_payment(debt_id=1, amount_in_cents=25000)
-            
+
             mock_debt_get.assert_called_once_with(1)
             mock_payment_get.assert_called_once_with(1)
             mock_payment_create.assert_called_once_with(debt_id=1, amount=25000)
@@ -633,20 +708,31 @@ class TestPaymentIntegration:
             status="confirmed",
             created_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._payment_repo, 'confirm_payment', return_value=confirmed_payment), \
-             patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[confirmed_payment]), \
-             patch.object(payment_manager._debt_repo, 'update_status') as mock_update:
-            
+
+        with patch.object(
+            payment_manager._payment_repo,
+            "confirm_payment",
+            return_value=confirmed_payment,
+        ), patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo,
+            "get_by_debt",
+            return_value=[confirmed_payment],
+        ), patch.object(
+            payment_manager._debt_repo, "update_status"
+        ) as mock_update:
+
             await payment_manager.confirm_payment(payment_id=1)
-            
+
             mock_update.assert_called_once_with(1, "paid")
 
     @pytest.mark.asyncio
     async def test_error_handling_in_integration(self, payment_manager):
         """Test error handling in repository integration."""
-        with patch.object(payment_manager._debt_repo, 'get', side_effect=Exception("Database error")):
+        with patch.object(
+            payment_manager._debt_repo, "get", side_effect=Exception("Database error")
+        ):
             with pytest.raises(Exception, match="Database error"):
                 await payment_manager.process_payment(debt_id=1, amount_in_cents=25000)
 
@@ -659,7 +745,7 @@ class TestPaymentWorkflowEdgeCases:
         """Test handling of concurrent payment processing attempts."""
         # This would test race conditions in a real implementation
         # For now, we test the basic validation logic
-        
+
         existing_payment = PaymentModel(
             payment_id=1,
             debt_id=1,
@@ -667,15 +753,19 @@ class TestPaymentWorkflowEdgeCases:
             status="confirmed",
             created_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[existing_payment]):
-            
+
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo,
+            "get_by_debt",
+            return_value=[existing_payment],
+        ):
+
             # Second payment would exceed remaining amount
-            with pytest.raises(ValueError, match="exceeds remaining debt"):
+            with pytest.raises(ValueError, match="payment_exceeds_remaining"):
                 await payment_manager.process_payment(
-                    debt_id=1,
-                    amount_in_cents=15000  # Only $100 remaining
+                    debt_id=1, amount_in_cents=15000  # Only $100 remaining
                 )
 
     @pytest.mark.asyncio
@@ -690,11 +780,15 @@ class TestPaymentWorkflowEdgeCases:
             status="active",
             created_at=DATETIME_2024,
         )
-        
-        with patch.object(payment_manager._debt_repo, 'get', return_value=large_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[]), \
-             patch.object(payment_manager._payment_repo, 'create_payment') as mock_create:
-            
+
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=large_debt
+        ), patch.object(
+            payment_manager._payment_repo, "get_by_debt", return_value=[]
+        ), patch.object(
+            payment_manager._payment_repo, "create_payment"
+        ) as mock_create:
+
             mock_create.return_value = PaymentModel(
                 payment_id=1,
                 debt_id=1,
@@ -702,22 +796,25 @@ class TestPaymentWorkflowEdgeCases:
                 status="pending_confirmation",
                 created_at=DATETIME_2024,
             )
-            
+
             result = await payment_manager.process_payment(
-                debt_id=1,
-                amount_in_cents=999999999
+                debt_id=1, amount_in_cents=999999999
             )
-            
+
             assert result.amount == 999999999
 
     @pytest.mark.asyncio
     async def test_payment_precision_handling(self, payment_manager, active_debt):
         """Test handling of payment amounts with cent precision."""
         # Test odd cent amounts
-        with patch.object(payment_manager._debt_repo, 'get', return_value=active_debt), \
-             patch.object(payment_manager._payment_repo, 'get_by_debt', return_value=[]), \
-             patch.object(payment_manager._payment_repo, 'create_payment') as mock_create:
-            
+        with patch.object(
+            payment_manager._debt_repo, "get", return_value=active_debt
+        ), patch.object(
+            payment_manager._payment_repo, "get_by_debt", return_value=[]
+        ), patch.object(
+            payment_manager._payment_repo, "create_payment"
+        ) as mock_create:
+
             mock_create.return_value = PaymentModel(
                 payment_id=1,
                 debt_id=1,
@@ -725,10 +822,9 @@ class TestPaymentWorkflowEdgeCases:
                 status="pending_confirmation",
                 created_at=DATETIME_2024,
             )
-            
+
             result = await payment_manager.process_payment(
-                debt_id=1,
-                amount_in_cents=12345
+                debt_id=1, amount_in_cents=12345
             )
-            
+
             assert result.amount == 12345

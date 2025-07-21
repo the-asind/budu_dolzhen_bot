@@ -41,7 +41,17 @@ async def handle_pay_command(message: Message, _: Callable) -> None:
             debt_id=debt_id, amount_in_cents=amount_in_cents
         )
     except Exception as exc:  # noqa: BLE001 - surface error to user
-        await message.reply(_("payment_processing_error", reason=str(exc)))
+        reason = str(exc)
+        if reason in {
+            "payment_amount_positive",
+            "payment_debt_not_found",
+            "payment_invalid_status",
+            "payment_exceeds_remaining",
+            "payment_not_found",
+        }:
+            await message.reply(_(reason))
+        else:
+            await message.reply(_("payment_processing_error", reason=reason))
         return
 
     await message.reply(_("payment_registered"))

@@ -1,10 +1,15 @@
 from aiogram import Router, F
-from aiogram.types import InlineQuery, InlineQueryResultArticle, InputTextMessageContent, CallbackQuery, Message
+from aiogram.types import (
+    InlineQuery,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+    CallbackQuery,
+    Message,
+)
 
-from bot.core.debt_parser import DebtParser
+from bot.core.debt_parser import DebtParser, DebtParseError
 from bot.core.debt_manager import DebtManager
 from bot.db.repositories import DebtRepository
-from bot.db.models import DebtStatus
 from bot.keyboards.debt_kbs import get_debt_confirmation_kb, decode_callback_data
 from bot.locales.main import _
 
@@ -33,7 +38,20 @@ async def handle_inline_query(inline_query: InlineQuery):
     author_username = inline_query.from_user.username or ""
     try:
         parsed = DebtParser.parse(query, author_username=author_username)
-        debts = await DebtManager.process_message(query, author_username=author_username)
+        debts = await DebtManager.process_message(
+            query, author_username=author_username
+        )
+    except DebtParseError as e:
+        error_article = InlineQueryResultArticle(
+            id="error",
+            title=_("debt_parsing_error"),
+            description=_(e.key),
+            input_message_content=InputTextMessageContent(
+                message_text=f"{_('debt_parsing_error')}\n{_('inline_query_format_help')}"
+            ),
+        )
+        await inline_query.answer([error_article], cache_time=1)
+        return
     except Exception as e:
         error_article = InlineQueryResultArticle(
             id="error",
@@ -56,17 +74,19 @@ async def handle_inline_query(inline_query: InlineQuery):
         except Exception:
             amount_display = str(pd.amount)
         description = pd.combined_comment or ""
-        message_text = (
-            f"⏳ @{author_username} says @{debtor_username} owes {amount_display}"
-            + (f" for '{description}'" if description else "")
+        message_text = _("inline_debt_message").format(
+            author=author_username,
+            debtor=debtor_username,
+            amount=amount_display,
+            description=description,
         )
         article = InlineQueryResultArticle(
             id=str(debt.debt_id),
-            title=f"Debt: @{debtor_username} - {amount_display}",
-            description=description,
-            input_message_content=InputTextMessageContent(
-                message_text=message_text
+            title=_("inline_debt_title").format(
+                debtor=debtor_username, amount=amount_display
             ),
+            description=description,
+            input_message_content=InputTextMessageContent(message_text=message_text),
             reply_markup=get_debt_confirmation_kb(debt.debt_id, lang),
         )
         results.append(article)
@@ -95,7 +115,9 @@ async def handle_debt_callback(callback_query: CallbackQuery):
                 if isinstance(message, Message):
                     await message.edit_text(text)
                 return
-            debt = await DebtManager.confirm_debt(debt_id, debtor_username=callback_query.from_user.username or "")
+            debt = await DebtManager.confirm_debt(
+                debt_id, debtor_username=callback_query.from_user.username or ""
+            )
             text = _("debt_confirmed_success").format(debt_id=debt.debt_id)
         except Exception as e:
             text = f"❌ {e}"
