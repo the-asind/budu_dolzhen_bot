@@ -108,10 +108,10 @@
   "debt_confirmed_success": "Great! Debt #{debt_id} has been successfully confirmed.",
   "debt_declined_success": "Debt #{debt_id} has been successfully declined.",
   "debt_confirmation_unauthorized": "You're not authorized to confirm this debt. Only the debtor can confirm debts.",
-  "debt_parsing_error": "Please check your format and try again. Use: @user amount description",
+  "debt_parsing_error": "Check your format and try again",
   "debt_not_found_error": "This debt could not be found. It may have already been processed.",
-  "inline_help_message": "To create a debt, type: @bot_username @user 500 for coffee",
-  "inline_query_format_help": "Format: @user amount description (e.g., @john 50 for lunch)",
+  "inline_help_message": "Create by example below: one line = one debt",
+  "inline_query_format_help": "Format: @user amount description (e.g., @john 50+2*4 for lunch)",
   "unknown_command": "Unknown command. Use /help to see the list of commands.",
   "db_error": "A database error occurred. Please try again later.",
   "button_details": "📋 Details",
@@ -175,5 +175,10 @@
   "payment_exceeds_remaining": "Payment exceeds remaining debt",
   "payment_not_found": "Payment not found",
   "inline_debt_message": "⏳ @{author} says @{debtor} owes {amount}{description}",
-  "inline_debt_title": "Debt: @{debtor} - {amount}"
+  "inline_debt_title": "Debt: @{debtor} - {amount}",
+  "inline_registration_title": "Start the bot firstk, click here",
+  "inline_registration_message": "Please click here to register with the bot first.",
+  "inline_send_all_option": "Send debts to everyone",
+  "inline_bulk_debt_message": "@{author} claims to be owed:\n{lines}\n\nCheck your direct messages for confirmation.",
+  "inline_unregistered_notice": "Important! {usernames} haven't started the bot yet. They will be notified once they do."
 }

@@ -49,14 +49,8 @@ async def _cleanup_connection_pool():
             # Close all existing connections in the pool
             if bot.db.connection._pool is not None:
                 connections_closed = 0
-                pool_size = (
-                    bot.db.connection._pool.qsize()
-                    if hasattr(bot.db.connection._pool, "qsize")
-                    else 0
-                )
-                logger.debug(
-                    f"Pool cleanup attempt {attempt + 1}: Pool size approximately {pool_size}"
-                )
+                pool_size = bot.db.connection._pool.qsize() if hasattr(bot.db.connection._pool, "qsize") else 0
+                logger.debug(f"Pool cleanup attempt {attempt + 1}: Pool size approximately {pool_size}")
 
                 # Use shorter timeouts with exponential backoff
                 timeout = min(1.0 * (1.5**attempt), 5.0)  # Cap at 5 seconds
@@ -64,10 +58,7 @@ async def _cleanup_connection_pool():
                 try:
                     # More robust pool emptying with timeout protection
                     start_time = time.time()
-                    while (
-                        not bot.db.connection._pool.empty()
-                        and time.time() - start_time < timeout
-                    ):
+                    while not bot.db.connection._pool.empty() and time.time() - start_time < timeout:
                         try:
                             conn = await asyncio.wait_for(
                                 bot.db.connection._pool.get(),
@@ -78,52 +69,35 @@ async def _cleanup_connection_pool():
                                     # Ensure connection is properly closed with shorter timeout
                                     await asyncio.wait_for(conn.close(), timeout=0.5)
                                     connections_closed += 1
-                                    logger.debug(
-                                        f"Closed connection {connections_closed}"
-                                    )
+                                    logger.debug(f"Closed connection {connections_closed}")
                                 except asyncio.TimeoutError:
-                                    logger.warning(
-                                        f"Timeout closing connection {connections_closed + 1}"
-                                    )
+                                    logger.warning(f"Timeout closing connection {connections_closed + 1}")
                                     # Force close if possible
                                     try:
-                                        if (
-                                            hasattr(conn, "_connection")
-                                            and conn._connection
-                                        ):
+                                        if hasattr(conn, "_connection") and conn._connection:
                                             conn._connection.close()
                                     except:
                                         pass
                                 except Exception as e:
-                                    logger.warning(
-                                        f"Error closing connection {connections_closed + 1}: {e}"
-                                    )
+                                    logger.warning(f"Error closing connection {connections_closed + 1}: {e}")
                         except asyncio.TimeoutError:
-                            logger.warning(
-                                f"Timeout getting connection from pool on attempt {attempt + 1}"
-                            )
+                            logger.warning(f"Timeout getting connection from pool on attempt {attempt + 1}")
                             break
                         except Exception as e:
                             logger.warning(f"Error getting connection from pool: {e}")
                             break
 
-                    logger.debug(
-                        f"Closed {connections_closed} connections on attempt {attempt + 1}"
-                    )
+                    logger.debug(f"Closed {connections_closed} connections on attempt {attempt + 1}")
 
                 except Exception as e:
-                    logger.warning(
-                        f"Error during pool cleanup attempt {attempt + 1}: {e}"
-                    )
+                    logger.warning(f"Error during pool cleanup attempt {attempt + 1}: {e}")
                     if attempt < max_retries - 1:
                         delay = base_delay * (1.5**attempt)
                         logger.debug(f"Retrying pool cleanup in {delay:.2f}s")
                         await asyncio.sleep(delay)
                         continue
                     else:
-                        logger.error(
-                            f"Failed to cleanup pool after {max_retries} attempts"
-                        )
+                        logger.error(f"Failed to cleanup pool after {max_retries} attempts")
 
             # Reset pool state with additional safety checks
             try:
@@ -139,9 +113,7 @@ async def _cleanup_connection_pool():
                     logger.debug("Pool cleanup verification successful")
                     return
                 else:
-                    logger.warning(
-                        f"Pool cleanup verification failed on attempt {attempt + 1}"
-                    )
+                    logger.warning(f"Pool cleanup verification failed on attempt {attempt + 1}")
                     if attempt < max_retries - 1:
                         delay = base_delay * (1.5**attempt)
                         await asyncio.sleep(delay)
@@ -154,9 +126,7 @@ async def _cleanup_connection_pool():
                     continue
 
         except Exception as e:
-            logger.error(
-                f"Unexpected error during pool cleanup attempt {attempt + 1}: {e}"
-            )
+            logger.error(f"Unexpected error during pool cleanup attempt {attempt + 1}: {e}")
             if attempt < max_retries - 1:
                 delay = base_delay * (1.5**attempt)
                 await asyncio.sleep(delay)
@@ -176,9 +146,7 @@ async def _verify_pool_clean():
         # Check that pool is None or empty
         if bot.db.connection._pool is not None:
             if not bot.db.connection._pool.empty():
-                logger.warning(
-                    f"Pool verification failed: Pool not empty, size: {bot.db.connection._pool.qsize()}"
-                )
+                logger.warning(f"Pool verification failed: Pool not empty, size: {bot.db.connection._pool.qsize()}")
                 return False
             logger.debug("Pool is empty")
         else:
@@ -202,9 +170,7 @@ async def _verify_database_schema(db_path: str) -> bool:
     try:
         async with get_connection() as conn:
             # Check that all required tables exist
-            cursor = await conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
+            cursor = await conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in await cursor.fetchall()]
 
             required_tables = ["users", "trusted_users", "debts", "payments"]
@@ -286,9 +252,7 @@ def temp_db_sync():
     unique_id = str(uuid.uuid4())[:8]
     timestamp = int(time.time() * 1000)
 
-    with tempfile.NamedTemporaryFile(
-        suffix=".db", prefix=f"budu_test_{unique_id}_", delete=False
-    ) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".db", prefix=f"budu_test_{unique_id}_", delete=False) as tmp:
         db_path = tmp.name
 
     logger.info(f"Creating temporary database for sync tests: {db_path}")
@@ -314,9 +278,7 @@ async def temp_db():
     timestamp = int(time.time() * 1000)
     db_filename = f"test_db_{unique_id}_{timestamp}.db"
 
-    with tempfile.NamedTemporaryFile(
-        suffix=".db", prefix=f"budu_test_{unique_id}_", delete=False
-    ) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".db", prefix=f"budu_test_{unique_id}_", delete=False) as tmp:
         db_path = tmp.name
 
     # Store original DATABASE_PATH for restoration
@@ -332,31 +294,21 @@ async def temp_db():
         try:
             await _cleanup_connection_pool()
             if await _verify_pool_clean():
-                logger.debug(
-                    f"Pool cleanup successful on attempt {cleanup_attempt + 1}"
-                )
+                logger.debug(f"Pool cleanup successful on attempt {cleanup_attempt + 1}")
                 break
             else:
                 if cleanup_attempt < max_cleanup_retries - 1:
-                    logger.warning(
-                        f"Pool cleanup verification failed, retrying... (attempt {cleanup_attempt + 1})"
-                    )
+                    logger.warning(f"Pool cleanup verification failed, retrying... (attempt {cleanup_attempt + 1})")
                     await asyncio.sleep(0.1 * (2**cleanup_attempt))
                 else:
                     logger.error("Pool cleanup failed after all retry attempts")
-                    raise RuntimeError(
-                        "Failed to cleanup connection pool before creating temp database"
-                    )
+                    raise RuntimeError("Failed to cleanup connection pool before creating temp database")
         except Exception as e:
             if cleanup_attempt < max_cleanup_retries - 1:
-                logger.warning(
-                    f"Pool cleanup attempt {cleanup_attempt + 1} failed: {e}, retrying..."
-                )
+                logger.warning(f"Pool cleanup attempt {cleanup_attempt + 1} failed: {e}, retrying...")
                 await asyncio.sleep(0.1 * (2**cleanup_attempt))
             else:
-                logger.error(
-                    f"Pool cleanup failed after {max_cleanup_retries} attempts: {e}"
-                )
+                logger.error(f"Pool cleanup failed after {max_cleanup_retries} attempts: {e}")
                 raise
 
     # Patch the DATABASE_PATH for testing with timeout handling
@@ -366,12 +318,8 @@ async def temp_db():
             max_access_retries = 3
             for access_attempt in range(max_access_retries):
                 try:
-                    if await asyncio.wait_for(
-                        _ensure_database_accessible(db_path), timeout=10.0
-                    ):
-                        logger.debug(
-                            f"Database accessibility verified on attempt {access_attempt + 1}"
-                        )
+                    if await asyncio.wait_for(_ensure_database_accessible(db_path), timeout=10.0):
+                        logger.debug(f"Database accessibility verified on attempt {access_attempt + 1}")
                         break
                     else:
                         if access_attempt < max_access_retries - 1:
@@ -429,15 +377,11 @@ async def temp_db():
                         await asyncio.sleep(0.1 * (2 ** (attempt - 1)))
 
                     os.unlink(db_path)
-                    logger.debug(
-                        f"Successfully removed temporary database file: {db_path}"
-                    )
+                    logger.debug(f"Successfully removed temporary database file: {db_path}")
                     break
                 except (OSError, PermissionError) as e:
                     if attempt < max_file_cleanup_retries - 1:
-                        logger.warning(
-                            f"File cleanup attempt {attempt + 1} failed: {e}, retrying..."
-                        )
+                        logger.warning(f"File cleanup attempt {attempt + 1} failed: {e}, retrying...")
                     else:
                         logger.error(
                             f"Failed to cleanup temporary database file after {max_file_cleanup_retries} attempts: {e}"
@@ -460,9 +404,7 @@ async def initialized_db(temp_db):
     for attempt in range(max_retries):
         try:
             # Log current database state for debugging
-            logger.debug(
-                f"Schema initialization attempt {attempt + 1} for database: {temp_db}"
-            )
+            logger.debug(f"Schema initialization attempt {attempt + 1} for database: {temp_db}")
 
             # Initialize the database with timeout
             await asyncio.wait_for(_initialize_database(), timeout=30.0)
@@ -470,9 +412,7 @@ async def initialized_db(temp_db):
 
             # Verify schema initialization was successful
             if await _verify_database_schema(temp_db):
-                logger.info(
-                    f"Database schema initialization verified successfully: {temp_db}"
-                )
+                logger.info(f"Database schema initialization verified successfully: {temp_db}")
 
                 # Additional verification: check connection pool state
                 import bot.db.connection
@@ -492,9 +432,7 @@ async def initialized_db(temp_db):
                     await conn.commit()
 
                     # Reset auto-increment counters for consistent test state
-                    await conn.execute(
-                        "DELETE FROM sqlite_sequence WHERE name IN ('users', 'debts', 'payments')"
-                    )
+                    await conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('users', 'debts', 'payments')")
                     await conn.commit()
                     logger.debug("Database cleared and reset for test isolation")
 
@@ -510,23 +448,17 @@ async def initialized_db(temp_db):
                 await _cleanup_connection_pool()
                 await asyncio.sleep(delay)
             else:
-                raise RuntimeError(
-                    f"Database initialization timed out after {max_retries} attempts"
-                )
+                raise RuntimeError(f"Database initialization timed out after {max_retries} attempts")
 
         except Exception as e:
             if attempt < max_retries - 1:
                 delay = base_delay * (2**attempt)
-                logger.warning(
-                    f"Database initialization attempt {attempt + 1} failed: {e}, retrying in {delay}s..."
-                )
+                logger.warning(f"Database initialization attempt {attempt + 1} failed: {e}, retrying in {delay}s...")
                 # Clean up and retry with exponential backoff
                 await _cleanup_connection_pool()
                 await asyncio.sleep(delay)
             else:
-                logger.error(
-                    f"Database initialization failed after {max_retries} attempts: {e}"
-                )
+                logger.error(f"Database initialization failed after {max_retries} attempts: {e}")
                 raise RuntimeError(f"Failed to initialize database: {e}") from e
 
     raise RuntimeError("Database initialization failed after all retry attempts")
@@ -541,9 +473,7 @@ class TestDatabaseInitialization:
 
         async with get_connection() as conn:
             # Check that tables exist
-            cursor = await conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
+            cursor = await conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in await cursor.fetchall()]
 
             expected_tables = ["users", "trusted_users", "debts", "payments"]
@@ -593,6 +523,11 @@ class TestUserRepository:
         assert user.first_name == "testuser"  # Uses username as first_name
         assert user.user_id is not None
         assert user.language_code == "ru"
+
+    async def test_placeholder_user_id_negative(self, initialized_db):
+        """Placeholder users should receive negative IDs."""
+        user = await UserRepository.add("placeholder")
+        assert user.user_id < 0
 
     async def test_add_user_duplicate_username(self, initialized_db):
         """Test adding user with duplicate username."""
@@ -1149,9 +1084,7 @@ class TestConcurrentAccess:
             users.append(user)
 
         async def add_trust_relationship(user_idx, trusted_idx):
-            await TrustedUserRepository.add_trust(
-                users[user_idx].user_id, users[trusted_idx].user_id
-            )
+            await TrustedUserRepository.add_trust(users[user_idx].user_id, users[trusted_idx].user_id)
 
         # Create trust relationships concurrently
         tasks = []
@@ -1263,9 +1196,7 @@ class TestComplexDebtScenarios:
         assert debt.amount == large_amount
 
         # Test payment against large debt
-        payment = await PaymentRepository.create_payment(
-            debt.debt_id, large_amount // 2
-        )
+        payment = await PaymentRepository.create_payment(debt.debt_id, large_amount // 2)
         assert payment.amount == large_amount // 2
 
     async def test_zero_amount_validation(self, initialized_db):
@@ -1368,9 +1299,7 @@ class TestErrorHandling:
             row = await cursor.fetchone()
             count = row[0] if row else 0
             # Should have exactly 1 debt (the valid one), the error one should have been rolled back
-            assert (
-                count == 1
-            ), f"Expected exactly 1 debt after rollback, but found {count}"
+            assert count == 1, f"Expected exactly 1 debt after rollback, but found {count}"
 
             # Verify the remaining debt is the valid one
             cursor = await conn.execute(
@@ -1463,6 +1392,4 @@ class TestPerformanceScenarios:
             if created_debts > 0:
                 assert len(balances) >= 0  # Allow for empty results in some cases
 
-            logger.debug(
-                f"Complex query test completed: {created_debts} debts created, {len(balances)} balances found"
-            )
+            logger.debug(f"Complex query test completed: {created_debts} debts created, {len(balances)} balances found")
