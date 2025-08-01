@@ -115,8 +115,8 @@ class DebtParser:
         amount_tokens: list[str] = []
         while i < len(tokens):
             tok = tokens[i]
-            if re.fullmatch(r"[0-9+\-*/]+", tok):
-                amount_tokens.append(tok)
+            if re.fullmatch(r"[0-9+\-*/.]+", tok):
+                amount_tokens.append(tok.replace(',','.'))
                 i += 1
             else:
                 break
@@ -141,6 +141,9 @@ class DebtParser:
 
         comment = " ".join(tokens[i:]).strip()
 
+        if len(comment) > 50:
+            comment = comment[:49] + "…"    
+        
         # No debtors? (all mentions are author)
         debtors = [m for m in mentions if m != author_username]
         if not debtors:
@@ -160,7 +163,7 @@ class DebtParser:
     @staticmethod
     def _safe_eval(expr: str) -> int:
         """Safely evaluate a simple arithmetic expression."""
-        if re.search(r"[^0-9+\-*/]", expr):
+        if re.search(r"[^0-9+\-*/.]", expr):
             raise TypeError("parser_invalid_characters")
 
         tree = ast.parse(expr, mode="eval")
@@ -184,9 +187,12 @@ class DebtParser:
         result = eval(
             compile(tree, filename="", mode="eval")
         )  # noqa: S307 safe by allowed_nodes
-        if not isinstance(result, (int, float)):
-            raise TypeError("parser_not_a_number")
+        if isinstance(result, float):
+            if result >= 0:
+                result = int(result + 0.5)
+            elif result == 0:
+                raise TypeError("parser_zero_summary")
+            else:
+                raise TypeError("parser_negative_summary")
 
-        if abs(result - int(result)) > 1e-9:
-            raise ValueError("parser_result_not_integer")
         return int(result)

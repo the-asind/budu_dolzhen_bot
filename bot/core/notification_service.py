@@ -86,6 +86,8 @@ class NotificationService:
         """
         Sends a debt confirmation request to the debtor with inline Agree/Decline buttons.
         """
+        if debtor.user_id < 0:
+            return 
         lang = debtor.language_code or creditor.language_code
         loc = Localization(lang)
         keyboard = get_debt_confirmation_kb(debt.debt_id, lang)

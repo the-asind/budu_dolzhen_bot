@@ -19,6 +19,7 @@ from bot.handlers.debt_handlers import router as debt_router
 from bot.handlers.payment_handlers import router as payment_router
 from bot.handlers.profile_handlers import profile_router
 from bot.handlers.inline_handlers import inline_router
+from bot.handlers.chosen_inline import chosen_router
 
 async def main():
     """The main function that starts the bot."""
@@ -54,6 +55,7 @@ async def main():
     dp.include_router(payment_router)
     dp.include_router(profile_router)
     dp.include_router(inline_router)
+    dp.include_router(chosen_router)
 
     scheduler_manager.start(bot)
 

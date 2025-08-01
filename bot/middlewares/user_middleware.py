@@ -201,7 +201,7 @@ class UserMiddleware(BaseMiddleware):
             try:
                 db_user = await UserRepository.get_by_id(user.id)
                 if not db_user:
-                    db_user = await UserRepository.add(user.username or f"user_{user.id}")
+                    db_user = await UserRepository.get_or_create_user(user.id, user.username, user.first_name, user.language_code)
                 
                 data["db_user"] = db_user
                 
