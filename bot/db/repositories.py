@@ -116,81 +116,66 @@ class UserRepository:
         first_name: str,
         language_code: str = "en",
     ) -> UserModel:
-        """Return existing user or create a new record."""
+        """Return existing user or create/merge as needed."""
         username_lc = username.lower()
-        existing = await cls.get_by_id(user_id)
-        if existing:
-            return existing
 
-        existing_username = await cls.get_by_username(username_lc)
-        if existing_username and existing_username.user_id != user_id:
+        conn_ctx = await _acquire_connection()
+        async with conn_ctx as conn:
+            await conn.execute("PRAGMA foreign_keys = ON")
+            await conn.execute("BEGIN")
             try:
-                ctx = await _acquire_connection()
-                async with ctx as conn:
-                    await conn.execute("PRAGMA foreign_keys = OFF")
-                    await conn.execute(
-                        "UPDATE users SET username = ? WHERE user_id = ?",
-                        (
-                            f"_old_{existing_username.user_id}",
-                            existing_username.user_id,
-                        ),
-                    )
-                    await conn.execute(
-                        "UPDATE debts SET creditor_id = ? WHERE creditor_id = ?",
-                        (user_id, existing_username.user_id),
-                    )
-                    await conn.execute(
-                        "UPDATE debts SET debtor_id = ? WHERE debtor_id = ?",
-                        (user_id, existing_username.user_id),
-                    )
-                    await conn.execute(
-                        "UPDATE trusted_users SET user_id = ? WHERE user_id = ?",
-                        (user_id, existing_username.user_id),
-                    )
-                    await conn.execute(
-                        "UPDATE trusted_users SET trusted_user_id = ? WHERE trusted_user_id = ?",
-                        (user_id, existing_username.user_id),
-                    )
-                    await conn.execute(
-                        "DELETE FROM users WHERE user_id = ?",
-                        (existing_username.user_id,),
-                    )
-                    try:
-                        await conn.execute(
-                            "INSERT OR IGNORE INTO users (user_id, username, first_name, language_code) VALUES (?, ?, ?, ?)",
-                            (user_id, username, first_name, language_code),
-                        )
-                    except aiosqlite.IntegrityError as exc:
-                        if "users.user_id" in str(exc):
-                            logger.warning(
-                                "User id %d already exists, returning existing record",
-                                user_id,
-                            )
-                            cursor = await conn.execute(
-                                "SELECT * FROM users WHERE user_id = ?",
-                                (user_id,),
-                            )
-                            row = await cursor.fetchone()
-                            if row:
-                                return UserModel(**dict(row))  # type: ignore
-                            raise
-                        raise
-                    await conn.execute("PRAGMA foreign_keys = ON")
-                    await conn.commit()
+                # 1) lookup by user_id
+                cursor = await conn.execute(
+                    """
+                    SELECT user_id, username, first_name, language_code
+                    FROM users
+                    WHERE user_id = ?
+                    """,
+                    (user_id,),
+                )
+                row = await cursor.fetchone()
+                if row:
+                    return UserModel(**dict(row))
 
+                # 2) lookup by username
+                cursor = await conn.execute(
+                    """
+                    SELECT user_id
+                    FROM users
+                    WHERE LOWER(username) = ?
+                    """,
+                    (username_lc,),
+                )
+                existing = await cursor.fetchone()
+                if existing:
+                    old_id = existing[0]
+                    # Merge into new user_id
+                    await conn.execute(
+                        """
+                        UPDATE users
+                        SET user_id       = ?,
+                            username      = ?,
+                            first_name    = ?,
+                            language_code = ?
+                        WHERE user_id = ?
+                        """,
+                        (user_id, username_lc, first_name, language_code, old_id),
+                    )
+                    await conn.commit()
                     cursor = await conn.execute(
-                        "SELECT * FROM users WHERE user_id = ?",
+                        """
+                        SELECT user_id, username, first_name, language_code
+                        FROM users
+                        WHERE user_id = ?
+                        """,
                         (user_id,),
                     )
                     row = await cursor.fetchone()
-                    return UserModel(**dict(row))  # type: ignore
-            except Exception as e:  # pragma: no cover - transformation logic
-                logger.exception("Failed to update placeholder user %s: %s", username, e)
-                raise
+                    if not row:
+                        raise RuntimeError(f"User {user_id} not found after merge")
+                    return UserModel(**dict(row))
 
-        try:
-            ctx = await _acquire_connection()
-            async with ctx as conn:
+                # 3) insert new user
                 await conn.execute(
                     """
                     INSERT INTO users (user_id, username, first_name, language_code)
@@ -198,41 +183,26 @@ class UserRepository:
                     """,
                     (user_id, username_lc, first_name, language_code),
                 )
-                try:
-                    await conn.execute(
-                        """
-                        INSERT INTO users (user_id, username, first_name, language_code)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        (user_id, username_lc, first_name, language_code),
-                    )
-                except aiosqlite.IntegrityError as exc:
-                    if "users.user_id" in str(exc):
-                        logger.warning(
-                            "User id %d already exists, returning existing record",
-                            user_id,
-                        )
-                        cursor = await conn.execute(
-                            "SELECT * FROM users WHERE user_id = ?",
-                            (user_id,),
-                        )
-                        row = await cursor.fetchone()
-                        if row:
-                            return UserModel(**dict(row))  # type: ignore
-                        raise
-                    raise
                 await conn.commit()
                 cursor = await conn.execute(
-                    "SELECT * FROM users WHERE user_id = ?",
+                    """
+                    SELECT user_id, username, first_name, language_code
+                    FROM users
+                    WHERE user_id = ?
+                    """,
                     (user_id,),
                 )
                 row = await cursor.fetchone()
-                if row:
-                    return UserModel(**dict(row))  # type: ignore
-                raise RuntimeError("Failed to retrieve user after insertion")
-        except Exception as e:
-            logger.exception("Failed to get_or_create user %s: %s", username, e)
-            raise
+                if not row:
+                    raise RuntimeError(f"Failed to retrieve user after insertion: {user_id}")
+                return UserModel(**dict(row))
+
+            except Exception as e:
+                # DB do brrr
+                logger.exception("Failed to get user by username %s", e)
+                await conn.rollback()
+                raise
+
 
     @classmethod
     async def update_user_language(cls, user_id: int, language_code: str) -> None:

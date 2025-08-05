@@ -6,7 +6,6 @@ from typing import Callable
 from ..db.repositories import UserRepository
 
 router = Router()
-user_repo = UserRepository()
 
 
 @router.message(Command("start"))
@@ -20,13 +19,6 @@ async def handle_start_command(message: Message, _: Callable):
     user = message.from_user
     if not user:
         return
-
-    await user_repo.get_or_create_user(
-        user_id=user.id,
-        username=user.username or f"user_{user.id}",
-        first_name=user.first_name or (user.username or str(user.id)),
-        language_code=user.language_code or "en",
-    )
 
     chat_type = message.chat.type
 

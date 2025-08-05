@@ -667,6 +667,42 @@ class TestUserRepository:
 
         assert await UserRepository.trusts(user1.user_id, "user2") is False
 
+    async def test_user_id_update_cascades(self, initialized_db):
+        """Updating user IDs cascades to debts and trusted_users."""
+        user1 = await UserRepository.add("user1")
+        user2 = await UserRepository.add("user2")
+
+        await TrustedUserRepository.add_trust(user1.user_id, user2.user_id)
+        debt = await DebtRepository.add(
+            creditor_id=user1.user_id,
+            debtor_id=user2.user_id,
+            amount=100,
+            description="t",
+        )
+
+        async with get_connection() as conn:
+            await conn.execute(
+                "UPDATE users SET user_id = ? WHERE user_id = ?",
+                (10, user1.user_id),
+            )
+            await conn.execute(
+                "UPDATE users SET user_id = ? WHERE user_id = ?",
+                (20, user2.user_id),
+            )
+            await conn.commit()
+
+        updated_debt = await DebtRepository.get(debt.debt_id)
+        assert updated_debt.creditor_id == 10
+        assert updated_debt.debtor_id == 20
+
+        async with get_connection() as conn:
+            cursor = await conn.execute(
+                "SELECT user_id, trusted_user_id FROM trusted_users"
+            )
+            row = await cursor.fetchone()
+
+        assert tuple(row) == (10, 20)
+        
     async def test_database_error_handling(self, initialized_db):
         """Test error handling for database failures."""
         # Test connection timeout scenario

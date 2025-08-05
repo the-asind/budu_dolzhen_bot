@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS trusted_users (
     trusted_user_id INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, trusted_user_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (trusted_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (trusted_user_id) REFERENCES users(user_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- Debts table
@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS debts (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     confirmed_at DATETIME,
     settled_at DATETIME,
-    FOREIGN KEY (creditor_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (debtor_id) REFERENCES users(user_id) ON DELETE CASCADE
+    FOREIGN KEY (creditor_id) REFERENCES users(user_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (debtor_id) REFERENCES users(user_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- Trigger to update debt's updated_at timestamp

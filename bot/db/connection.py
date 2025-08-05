@@ -60,8 +60,8 @@ async def _initialize_schema(conn: aiosqlite.Connection) -> None:
             trusted_user_id INTEGER NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (user_id, trusted_user_id),
-            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-            FOREIGN KEY (trusted_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE ON UPDATE CASCADE,
+            FOREIGN KEY (trusted_user_id) REFERENCES users(user_id) ON DELETE CASCADE ON UPDATE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS debts (
@@ -75,8 +75,8 @@ async def _initialize_schema(conn: aiosqlite.Connection) -> None:
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             confirmed_at DATETIME,
             settled_at DATETIME,
-            FOREIGN KEY (creditor_id) REFERENCES users(user_id) ON DELETE CASCADE,
-            FOREIGN KEY (debtor_id) REFERENCES users(user_id) ON DELETE CASCADE
+            FOREIGN KEY (creditor_id) REFERENCES users(user_id) ON DELETE CASCADE ON UPDATE CASCADE,
+            FOREIGN KEY (debtor_id) REFERENCES users(user_id) ON DELETE CASCADE ON UPDATE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS payments (

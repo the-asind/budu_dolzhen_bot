@@ -1,51 +1,45 @@
-## 1. Архитектура и модульность
-- **Каждый модуль обязан иметь единую ответственность** (SRP).  
-  Файл > 400 LOC или функция > 30 LOC считается code-smell — разбивай.
-- Храни Telegram-логики в `bot/handlers/`, работу с БД — в `bot/db/`, вспомогательные утилиты — в `bot/utils/`.  
-  Никогда не смешивай SQL-запросы с обработчиками сообщений.
+# Agent Guidelines
 
-## 2. Асинхронность и стек
-- Пиши только на **Python 3.12+** c **aiogram 3.x**; всегда используй `async def` и `await`.
-- Для БД применяй **SQLite** + `aiosqlite` *только* с параметризованными запросами (`?`) — никаких строковых конкатенаций.
+These instructions apply to the entire repository. Follow them when modifying or adding any files.
 
-## 3. Стиль и качество
-- Код должен проходить **black** (120 cols) и **ruff** без ошибок.  
-- Следуй **PEP8** и используй **type hints**; для структур данных — `@dataclass`.
-- Все public-функции и классы снабжай **docstring** формата *Google-style*.
+## Project overview
+- Python 3.12+ with [aiogram](https://docs.aiogram.dev/en/latest/) 3.x.
+- Telegram-specific logic lives in `bot/handlers/`.
+- Database access and models live in `bot/db/`.
+- Reusable helpers go to `bot/utils/`.
+- Do **not** mix SQL queries with handlers; always use the repository layer and parameterized `?` placeholders with SQLite/aiosqlite.
 
-## 4. Test-Driven & TODO-Driven Development
-1. **Перед** реализацией новой логики добавь/обнови unit-тесты (`tests/`) с `pytest` и `pytest-asyncio`; тест должен _падать_.  
-2. Напиши минимальный код, чтобы тест **зеленел**; рефакторь, сохраняя зелёные тесты.  
-3. Каждый `TODO:` в коде обязан ссылаться на номер issue и сопровождаться **тестом, воспроизводящим ожидание**.  
-   Удаляй `TODO`, как только задача выполнена и тесты зелёные.  
-4. Покрытие кода (`pytest --cov`) минимум **80 %** для `bot/`.  
+## Style
+- Format with **black** using 120 characters per line:
+  ```bash
+  python -m black . --line-length 120
+  ```
+- Lint with **ruff** and fix issues before committing:
+  ```bash
+  python -m ruff .
+  ```
+- Follow PEP8, use type hints and `@dataclass` for simple data containers.
+- Public classes and functions require Google‑style docstrings.
+- Keep modules focused on a single responsibility; split files >400 LOC or functions >30 LOC.
 
-## 5. Безопасность и конфиденциальность
-- Никаких токенов, паролей и SQL-дампов в репозитории.  
-  Читай их из `ENV` через `python-dotenv`; для секретов используй `.env.example`.
-- Запрещено использовать `eval`, `exec`, небезопасные «сырые» SQL.  
-- Всегда валидируй пользовательский ввод: суммы должны быть `int` ≥ 0; `username` — RegExp `^@[A-Za-z0-9_]{5,}$`.
+## Testing
+1. When adding behaviour, write or update tests in `tests/` first (`pytest` + `pytest-asyncio`).
+2. Ensure new tests fail before implementation and pass afterwards.
+3. Run the full test suite and coverage:
+   ```bash
+   pytest --cov=bot
+   ```
+   The `bot/` package must keep ≥80 % coverage.
 
-## 6. Логирование
-- Используй встроенный модуль `logging`; **никаких `print()`**.  
-  Формат по умолчанию — `%(asctime)s %(levelname)s [%(name)s] %(message)s`.
+## Security
+- Never commit secrets, tokens, or database dumps. Load configuration from environment variables (see `.env.example`).
+- Avoid `eval`, `exec`, or raw SQL string concatenation.
+- Validate user input: amounts are non‑negative integers; usernames match `^@[A-Za-z0-9_]{5,}$`.
 
-## 7. Контекст вызова AI-ассистента
-- Если для решения запроса нужен файл, **включи его через `@file`** (Cursor `@-syntax`).  
-- Перед любым автоматическим правлением файлов:
-  1. Найди релевантные тесты (`@tests/…`) и включи их в контекст.  
-  2. Спроси пользователя, если спецификация неочевидна.
+## Logging
+- Use the standard `logging` module (format `%(asctime)s %(levelname)s [%(name)s] %(message)s`). Avoid `print`.
 
-## 8. Коммиты и PR-ы
-- Соблюдай **Conventional Commits** (`feat:`, `fix:`, `refactor:` …).  
-- На каждый PR — CI-прогоны: форматтер, линтер, тесты.
-
-## 9. Ограничения генерации
-- **Никогда** не генерируй большие блоки без тестов.  
-- Если задача требует UI-кода или SQL-миграции, создай отдельные PR-файлы в `migrations/` или `bot/ui/`, а затем обнови тесты.
-
-## 10. Документация
-- Обновляй `README.md` и `docs/` при изменении публичного API или команд бота.  
-- Храни схемы БД в `docs/schema.sql` и генерируй диаграмму ERD при крупных изменениях.
-
-> Нарушение любого пункта считается ошибкой CI; генерация, не соответствующая правилам, должна быть отклонена или отредактирована.
+## Commits & PRs
+- Use **Conventional Commit** messages (`feat:`, `fix:`, `refactor:`, etc.).
+- Run formatter, linter and tests before each commit/PR.
+- Update `README.md` or `docs/` when behaviour or public APIs change.
