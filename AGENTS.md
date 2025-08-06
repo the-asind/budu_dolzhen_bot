@@ -9,6 +9,17 @@ These instructions apply to the entire repository. Follow them when modifying or
 - Reusable helpers go to `bot/utils/`.
 - Do **not** mix SQL queries with handlers; always use the repository layer and parameterized `?` placeholders with SQLite/aiosqlite.
 
+## Repository layout
+- `bot/` – application package
+  - `core/` business logic
+  - `db/` SQLite models and repositories
+  - `handlers/` aiogram message and callback handlers
+  - `keyboards/` inline keyboards
+  - `locales/`, `middlewares/`, `scheduler/`, `utils/`
+- `tests/` – pytest suite
+- `docs/schema.sql` – database schema
+- `main.py` – entry point
+
 ## Style
 - Format with **black** using 120 characters per line:
   ```bash

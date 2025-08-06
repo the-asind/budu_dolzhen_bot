@@ -62,3 +62,92 @@ async def test_auto_confirmation_when_trusted() -> None:
     print(f"Debug: debt.status={debt.status} (debt_id={debt.debt_id})")
     # When debtor trusts the creditor the debt should be active immediately
     assert debt.status == "active"
+
+
+@pytest.mark.asyncio
+async def test_confirm_debt_offsets_existing_opposite_debt() -> None:
+    """Confirming a debt should offset any active debt in the opposite direction."""
+    user1 = await UserRepository.add("user1")
+    user2 = await UserRepository.add("user2")
+
+    existing = await DebtRepository.add(
+        creditor_id=user2.user_id,
+        debtor_id=user1.user_id,
+        amount=2000,
+        description="initial",
+    )
+    await DebtRepository.update_status(existing.debt_id, "active")
+
+    reverse = await DebtRepository.add(
+        creditor_id=user1.user_id,
+        debtor_id=user2.user_id,
+        amount=1000,
+        description="reverse",
+    )
+
+    confirmed = await DebtManager.confirm_debt(reverse.debt_id, debtor_username="user2")
+    assert confirmed.status == "paid"
+
+    updated = await DebtRepository.get(existing.debt_id)
+    assert updated.amount == 1000
+    assert updated.status == "active"
+
+
+@pytest.mark.asyncio
+async def test_confirm_debt_offsets_and_reduces_new_debt() -> None:
+    """Remaining amount should stay with new debt if it's larger than existing."""
+    user1 = await UserRepository.add("alpha")
+    user2 = await UserRepository.add("beta")
+
+    existing = await DebtRepository.add(
+        creditor_id=user1.user_id,
+        debtor_id=user2.user_id,
+        amount=500,
+        description="initial",
+    )
+    await DebtRepository.update_status(existing.debt_id, "active")
+
+    reverse = await DebtRepository.add(
+        creditor_id=user2.user_id,
+        debtor_id=user1.user_id,
+        amount=1000,
+        description="reverse",
+    )
+
+    confirmed = await DebtManager.confirm_debt(reverse.debt_id, debtor_username="alpha")
+    assert confirmed.status == "active"
+    assert confirmed.amount == 500
+
+    updated = await DebtRepository.get(existing.debt_id)
+    assert updated.status == "paid"
+
+
+@pytest.mark.asyncio
+async def test_confirm_debt_merges_existing_same_direction_debt() -> None:
+    """Confirming a debt should increase existing active debt instead of creating another."""
+
+    user1 = await UserRepository.add("gamma")
+    user2 = await UserRepository.add("delta")
+
+    existing = await DebtRepository.add(
+        creditor_id=user1.user_id,
+        debtor_id=user2.user_id,
+        amount=700,
+        description="first",
+    )
+    await DebtRepository.update_status(existing.debt_id, "active")
+
+    new_debt = await DebtRepository.add(
+        creditor_id=user1.user_id,
+        debtor_id=user2.user_id,
+        amount=300,
+        description="second",
+    )
+
+    merged = await DebtManager.confirm_debt(new_debt.debt_id, debtor_username="delta")
+    assert merged.debt_id == existing.debt_id
+    assert merged.amount == 1000
+    assert merged.status == "active"
+
+    updated_new = await DebtRepository.get(new_debt.debt_id)
+    assert updated_new.status == "paid"

@@ -10,13 +10,16 @@ from aiogram.exceptions import TelegramAPIError, TelegramRetryAfter
 
 correlation_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("correlation_id", default="")
 
+
 class CorrelationIdFilter(logging.Filter):
     """
     Logging filter to inject the correlation_id into log records.
     """
+
     def filter(self, record: logging.LogRecord) -> bool:
         record.correlation_id = correlation_id_ctx.get()
         return True
+
 
 # Configure logger with structured data filter
 logger = logging.getLogger(__name__)
@@ -25,15 +28,18 @@ logger.addFilter(CorrelationIdFilter())
 # Helper used throughout the middleware to create human-readable key=value
 # strings that are also easy to assert against in unit-tests.
 
+
 def _fmt_ctx(ctx: Dict[str, Any]) -> str:
     """Return a deterministic key=value string used in log messages."""
     return " ".join(f"{k}={v}" for k, v in ctx.items() if v is not None)
+
 
 class LoggingMiddleware(BaseMiddleware):
     """
     This middleware logs incoming updates with structured logs,
     correlation IDs, performance metrics, FSM states, and rate-limiting info.
     """
+
     async def __call__(
         self,
         handler: Callable[[Update, Dict[str, Any]], Awaitable[Any]],
@@ -73,7 +79,7 @@ class LoggingMiddleware(BaseMiddleware):
         def _clean_state(s: Any) -> str:
             raw = str(s)
             if raw.startswith("<State '") and raw.endswith("'>"):
-                return raw[len("<State '"):-2]
+                return raw[len("<State '") : -2]
             return raw
 
         prev_state = data.get("previous_state")
@@ -143,11 +149,16 @@ class LoggingMiddleware(BaseMiddleware):
             # Performance metrics and post-processing log
             elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
-            # Safely extract handler name – AsyncMock used in tests doesn't have
             # __qualname__ attribute.
+            handler_module = getattr(handler, "__module__", "")
             handler_name = getattr(handler, "__qualname__", None)
             if handler_name is None:
                 handler_name = handler.__class__.__name__
+
+            if handler_module == "functools" and handler_name == "partial":
+                handler_repr = "UNHANDLED"
+            else:
+                handler_repr = f"{handler_module}.{handler_name}"
 
             processed_ctx = {
                 "correlation_id": cid,
@@ -155,7 +166,7 @@ class LoggingMiddleware(BaseMiddleware):
                 "update_type": event.event_type,
                 "update_id": event.update_id,
                 "fsm_state": fsm_state,
-                "handler": f"{handler.__module__}.{handler_name}",
+                "handler": handler_repr,
                 "execution_time_ms": elapsed_ms,
             }
 

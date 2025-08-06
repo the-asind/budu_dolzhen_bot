@@ -203,7 +203,6 @@ class UserRepository:
                 await conn.rollback()
                 raise
 
-
     @classmethod
     async def update_user_language(cls, user_id: int, language_code: str) -> None:
         """Update user's language preference."""
@@ -418,6 +417,32 @@ class DebtRepository:
             raise
 
     @classmethod
+    async def list_active_between(cls, creditor_id: int, debtor_id: int) -> List[DebtModel]:
+        """List active debts for a specific creditor/debtor pair."""
+        try:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
+                cursor = await conn.execute(
+                    """
+                    SELECT * FROM debts
+                    WHERE status = 'active'
+                      AND creditor_id = ? AND debtor_id = ?
+                    ORDER BY created_at ASC
+                    """,
+                    (creditor_id, debtor_id),
+                )
+                rows = await cursor.fetchall()
+                return [DebtModel(**dict(row)) for row in rows]  # type: ignore
+        except Exception as e:
+            logger.exception(
+                "Failed to list active debts between %d and %d: %s",
+                creditor_id,
+                debtor_id,
+                e,
+            )
+            raise
+
+    @classmethod
     async def get(cls, debt_id: int) -> Optional[DebtModel]:
         """Get a debt by its ID."""
         try:
@@ -452,6 +477,31 @@ class DebtRepository:
                 return DebtModel(**dict(row))  # type: ignore
         except Exception as e:
             logger.exception("Failed to update status for debt %d: %s", debt_id, e)
+            raise
+
+    @classmethod
+    async def update_amount(cls, debt_id: int, amount: int) -> DebtModel:
+        """Update the amount of a debt."""
+        if amount <= 0:
+            raise ValueError("Amount must be positive")
+        try:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
+                await conn.execute(
+                    "UPDATE debts SET amount = ? WHERE debt_id = ?",
+                    (amount, debt_id),
+                )
+                await conn.commit()
+                cursor = await conn.execute(
+                    "SELECT * FROM debts WHERE debt_id = ?",
+                    (debt_id,),
+                )
+                row = await cursor.fetchone()
+                if row is None:
+                    raise ValueError("Debt not found")
+                return DebtModel(**dict(row))  # type: ignore
+        except Exception as e:
+            logger.exception("Failed to update amount for debt %d: %s", debt_id, e)
             raise
 
 

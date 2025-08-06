@@ -1,17 +1,20 @@
+import logging
 from typing import Callable, Dict, List
 from collections import defaultdict
+
 from aiogram import Bot, Router, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 
 from ..core.debt_manager import DebtManager
 from ..core.notification_service import NotificationService
 from ..db.repositories import DebtRepository, UserRepository
 from ..utils.formatters import format_amount
-from ..locales.main import _
+from ..keyboards.debt_kbs import decode_callback_data
 
 router = Router()
 user_repo = UserRepository()
+logger = logging.getLogger(__name__)
 
 
 @router.message(F.text & F.text.startswith("@"))
@@ -114,3 +117,39 @@ async def handle_summary_command(message: Message, _: Callable) -> None:
             lines.append(f"- {user} {format_amount(amount)}")
 
     await message.reply("\n".join(lines))
+
+
+@router.callback_query()
+async def handle_debt_callback(callback: CallbackQuery, _: Callable) -> None:
+    """Process Agree/Decline actions from debt confirmation keyboards."""
+    if not callback.data:
+        return
+
+    payload = decode_callback_data(callback.data)
+    action = payload.get("action")
+    debt_id = payload.get("debt_id")
+
+    if action not in {"debt_agree", "debt_decline"} or debt_id is None:
+        return
+
+    try:
+        if action == "debt_agree":
+            debtor_username = callback.from_user.username or ""
+            await DebtManager.confirm_debt(debt_id, debtor_username=debtor_username)
+            text = _("debt_confirmed_success", debt_id=debt_id)
+        else:
+            debt = await DebtRepository.get(debt_id)
+            if debt is None or debt.debtor_id != callback.from_user.id:
+                await callback.answer(_("debt_confirmation_unauthorized"), show_alert=True)
+                return
+            await DebtRepository.update_status(debt_id, "rejected")
+            text = _("debt_declined_success", debt_id=debt_id)
+
+        await callback.message.edit_text(text)
+        await callback.answer()
+    except ValueError as exc:  # noqa: BLE001
+        logger.warning("Debt callback failed: %s", exc)
+        await callback.answer(_("debt_not_found_error"), show_alert=True)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Unexpected error processing debt callback: %s", exc)
+        await callback.answer(_("error_generic"), show_alert=True)
