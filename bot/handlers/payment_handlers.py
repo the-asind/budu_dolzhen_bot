@@ -78,7 +78,9 @@ async def handle_pay_command(message: Message, notification_service: Notificatio
     await message.reply(_("payment_registered"))
 
 
-@router.callback_query()
+@router.callback_query(
+    lambda c: c.data and decode_callback_data(c.data).get("action") in {"payment_approve", "payment_reject"}
+)
 async def handle_payment_callback(
     callback: CallbackQuery, notification_service: NotificationService, _: Callable
 ) -> None:
@@ -91,7 +93,7 @@ async def handle_payment_callback(
     payment_id = payload.get("payment_id")
     debt_id = payload.get("debt_id")
 
-    if action not in {"payment_approve", "payment_reject"} or payment_id is None or debt_id is None:
+    if payment_id is None or debt_id is None:
         return
 
     debt = await DebtRepository.get(debt_id)

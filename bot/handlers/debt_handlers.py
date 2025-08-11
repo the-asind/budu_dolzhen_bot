@@ -7,6 +7,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, Update
 
 from ..core.debt_manager import DebtManager
+from ..core.debt_parser import DebtParseError
 from ..core.notification_service import NotificationService
 from ..db.repositories import DebtRepository, PaymentRepository, UserRepository
 from ..utils.formatters import format_amount
@@ -62,10 +63,14 @@ async def handle_debt_message(
 
     debt_manager = DebtManager()
 
-    result = await debt_manager.process_message(
-        message=text,
-        author_username=message.from_user.username or "",
-    )
+    try:
+        result = await debt_manager.process_message(
+            message=text,
+            author_username=message.from_user.username or "",
+        )
+    except DebtParseError:
+        await message.reply(_("unknown_command"))
+        return
 
     if result:
         await message.reply(_("debts_registered"))
@@ -143,7 +148,9 @@ async def handle_summary_command(message: Message, _: Callable) -> None:
     await message.reply("\n".join(lines))
 
 
-@router.callback_query()
+@router.callback_query(
+    lambda c: c.data and decode_callback_data(c.data).get("action") in {"debt_agree", "debt_decline"}
+)
 async def handle_debt_callback(callback: CallbackQuery, notification_service: NotificationService, _: Callable) -> None:
     """Process Agree/Decline actions from debt confirmation keyboards."""
     if not callback.data:
@@ -153,7 +160,7 @@ async def handle_debt_callback(callback: CallbackQuery, notification_service: No
     action = payload.get("action")
     debt_id = payload.get("debt_id")
 
-    if action not in {"debt_agree", "debt_decline"} or debt_id is None:
+    if debt_id is None:
         return
 
     try:

@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 
 from bot.handlers.payment_handlers import handle_pay_command, handle_payment_callback
+from bot.handlers.debt_handlers import router as debt_router
 from bot.keyboards.debt_kbs import encode_callback_data
 from tests.conftest import make_mutable_callback_query
 
@@ -110,3 +111,13 @@ async def test_payment_callback_reject(model_user, mock_notification_service):
 
     cb.message.edit_text.assert_called_once_with("payment_confirm_declined")
     mock_notification_service.send_message.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_debt_handler_filter_excludes_payment_callback(model_user):
+    cb = make_mutable_callback_query(
+        from_user=model_user(id=1, username="cred"),
+        data=encode_callback_data("payment_approve", 1, payment_id=5),
+    )
+    filter_fn = debt_router.callback_query.handlers[0].filters[0].callback
+    assert filter_fn(cb) is False

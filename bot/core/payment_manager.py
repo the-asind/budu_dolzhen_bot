@@ -40,8 +40,8 @@ class PaymentManager:
             raise ValueError("payment_invalid_status")
 
         existing_payments = await self._payment_repo.get_by_debt(debt_id)
-        total_confirmed = sum(p.amount for p in existing_payments if p.status == "confirmed")
-        remaining = debt.amount - total_confirmed
+        total_pending = sum(p.amount for p in existing_payments if p.status == "pending_confirmation")
+        remaining = debt.amount - total_pending
         if amount_in_cents > remaining:
             raise ValueError("payment_exceeds_remaining")
 
@@ -51,12 +51,12 @@ class PaymentManager:
 
     async def confirm_payment(self, payment_id: int) -> PaymentModel:
         """
-        Confirms a pending payment, updates its status, and updates debt status if settled.
+        Confirms a pending payment and updates the related debt.
 
         Steps:
         1. Confirm the payment record.
-        2. Recalculate total confirmed payments for the debt.
-        3. If fully paid, mark debt as 'paid'; otherwise keep 'active'.
+        2. Subtract the payment from the remaining debt amount.
+        3. Mark the debt as paid if fully settled.
 
         Args:
             payment_id: The ID of the payment to confirm.
@@ -66,25 +66,21 @@ class PaymentManager:
         Raises:
             ValueError: If payment or debt not found.
         """
-        # Confirm the payment
         payment = await self._payment_repo.confirm_payment(payment_id)
         if payment is None:
             raise ValueError("payment_not_found")
 
-        # Retrieve associated debt
         debt = await self._debt_repo.get(payment.debt_id)
         if debt is None:
             raise ValueError("payment_debt_not_found")
 
-        # Sum confirmed payments
-        all_payments = await self._payment_repo.get_by_debt(debt.debt_id)
-        total_confirmed = sum(p.amount for p in all_payments if p.status == "confirmed")
-
-        # Update debt status if fully paid
-        if total_confirmed >= debt.amount:
+        new_amount = debt.amount - payment.amount
+        if new_amount < 0:
+            raise ValueError("payment_exceeds_remaining")
+        if new_amount == 0:
             await self._debt_repo.update_status(debt.debt_id, "paid")
         else:
-            await self._debt_repo.update_status(debt.debt_id, "active")
+            await self._debt_repo.update_amount(debt.debt_id, new_amount)
 
         return payment
 
