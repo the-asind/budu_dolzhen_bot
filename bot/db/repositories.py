@@ -561,6 +561,34 @@ class PaymentRepository:
             raise
 
     @classmethod
+    async def get(cls, payment_id: int) -> Optional[PaymentModel]:
+        """Retrieve a payment by its ID."""
+        try:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
+                cursor = await conn.execute(
+                    "SELECT * FROM payments WHERE payment_id = ?",
+                    (payment_id,),
+                )
+                row = await cursor.fetchone()
+                return PaymentModel(**dict(row)) if row else None  # type: ignore
+        except Exception as e:
+            logger.exception("Failed to get payment %d: %s", payment_id, e)
+            raise
+
+    @classmethod
+    async def delete(cls, payment_id: int) -> None:
+        """Delete a payment record."""
+        try:
+            ctx = await _acquire_connection()
+            async with ctx as conn:
+                await conn.execute("DELETE FROM payments WHERE payment_id = ?", (payment_id,))
+                await conn.commit()
+        except Exception as e:
+            logger.exception("Failed to delete payment %d: %s", payment_id, e)
+            raise
+
+    @classmethod
     async def confirm_payment(cls, payment_id: int) -> PaymentModel:
         """Confirm a pending payment."""
         try:

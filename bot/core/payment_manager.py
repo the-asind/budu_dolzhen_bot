@@ -40,16 +40,12 @@ class PaymentManager:
             raise ValueError("payment_invalid_status")
 
         existing_payments = await self._payment_repo.get_by_debt(debt_id)
-        total_confirmed = sum(
-            p.amount for p in existing_payments if p.status == "confirmed"
-        )
+        total_confirmed = sum(p.amount for p in existing_payments if p.status == "confirmed")
         remaining = debt.amount - total_confirmed
         if amount_in_cents > remaining:
             raise ValueError("payment_exceeds_remaining")
 
-        payment = await self._payment_repo.create_payment(
-            debt_id=debt_id, amount=amount_in_cents
-        )
+        payment = await self._payment_repo.create_payment(debt_id=debt_id, amount=amount_in_cents)
 
         return payment
 
@@ -90,6 +86,14 @@ class PaymentManager:
         else:
             await self._debt_repo.update_status(debt.debt_id, "active")
 
+        return payment
+
+    async def reject_payment(self, payment_id: int) -> PaymentModel:
+        """Reject a pending payment and remove it."""
+        payment = await self._payment_repo.get(payment_id)
+        if payment is None:
+            raise ValueError("payment_not_found")
+        await self._payment_repo.delete(payment_id)
         return payment
 
     async def get_payment_history(self, debt_id: int) -> List[PaymentModel]:

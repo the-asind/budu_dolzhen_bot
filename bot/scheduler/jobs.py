@@ -81,7 +81,13 @@ async def check_confirmation_timeouts(bot: Bot | None = None):
             db.row_factory = aiosqlite.Row
             # select debts pending before cutoff
             cursor = await db.execute(
-                "SELECT debt_id, creditor_id, debtor_id FROM debts " "WHERE status = 'pending' AND created_at < ?",
+                (
+                    "SELECT d.debt_id, d.creditor_id, d.debtor_id, uc.username AS creditor_username, "
+                    "ud.username AS debtor_username FROM debts d "
+                    "LEFT JOIN users uc ON uc.user_id = d.creditor_id "
+                    "LEFT JOIN users ud ON ud.user_id = d.debtor_id "
+                    "WHERE d.status = 'pending' AND d.created_at < ?"
+                ),
                 (cutoff.isoformat(),),
             )
             expired = await cursor.fetchall()
@@ -92,6 +98,7 @@ async def check_confirmation_timeouts(bot: Bot | None = None):
                 debt_id = row["debt_id"]
                 creditor_id = row["creditor_id"]
                 debtor_id = row["debtor_id"]
+                debtor_username = row["debtor_username"]
 
                 # update status to rejected
                 try:
@@ -105,8 +112,9 @@ async def check_confirmation_timeouts(bot: Bot | None = None):
                     continue
 
                 # notify creditor
+                debtor_display = f"@{debtor_username}" if debtor_username else f"user {debtor_id}"
                 text = (
-                    f"⚠️ Debt #{debt_id} from user {debtor_id} was not confirmed within 23 hours "
+                    f"⚠️ Debt from {debtor_display} was not confirmed within 23 hours "
                     f"and has been automatically rejected."
                 )
                 try:

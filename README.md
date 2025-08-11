@@ -89,10 +89,10 @@ The container uses the same `.env` file and persists the SQLite database in the 
 - `/start` – Register with the bot and see onboarding instructions.
 - `/help` – Detailed help with examples and tips.
 - `/settings` – Open the profile settings menu (contact info, reminders, trusted users).
-- `/summary` – Get a quick overview of who owes you and whom you owe.
+- `/summary` – View active debts and pending payments awaiting your confirmation.
 - **Recording debts** – Mention users with an amount and optional description. Example:
   `@alice @bob 900/3 dinner` – both users owe you 300 each.
-- **Marking payments** – Send `скинул @alice 1000` in a private chat with the bot to log a payment.
+- **Marking payments** – Use `/pay @alice 1000` in a private chat with the bot to log a payment.
 
 The bot works in private chats and groups; pending confirmations expire after 23 hours if not accepted.
 

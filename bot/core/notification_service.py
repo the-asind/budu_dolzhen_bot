@@ -87,7 +87,7 @@ class NotificationService:
         Sends a debt confirmation request to the debtor with inline Agree/Decline buttons.
         """
         if debtor.user_id < 0:
-            return 
+            return
         lang = debtor.language_code or creditor.language_code
         loc = Localization(lang)
         keyboard = get_debt_confirmation_kb(debt.debt_id, lang)
@@ -102,22 +102,23 @@ class NotificationService:
         self,
         payment_id: int,
         debt_id: int,
-        amount: float,
+        amount: int,
         creditor: User,
         payer: User,
         correlation_id: Optional[str] = None,
     ) -> bool:
-        """
-        Sends a payment confirmation request to the creditor with inline Approve/Reject buttons.
-        """
+        """Send a payment confirmation prompt to the creditor."""
+
         lang = creditor.language_code or payer.language_code
+        loc = Localization(lang)
         keyboard = get_payment_confirmation_kb(payment_id, debt_id, lang)
-        text = (
-            f"💰 {creditor.username}, payment request #{payment_id} for debt "
-            f"{debt_id} of ${amount:.2f} has been initiated by {payer.username}. "
-            f"Please review."
+        text = loc.payment_pending_creditor.format(payer=f"@{payer.username}", amount=format_amount(amount))
+        return await self.send_message(
+            creditor.user_id,
+            text,
+            correlation_id=correlation_id,
+            reply_markup=keyboard,
         )
-        return await self.send_message(creditor.user_id, text, correlation_id=correlation_id, reply_markup=keyboard)
 
     async def animate_status_update(
         self,

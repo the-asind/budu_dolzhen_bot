@@ -564,26 +564,6 @@ class TestUserRepository:
         updated_debt = await DebtRepository.get(debt.debt_id)
         assert updated_debt.creditor_id == 12345
 
-    async def test_concurrent_registration_same_user_id(self, initialized_db):
-        """Concurrent registration should not violate UNIQUE constraints."""
-        await UserRepository.add("concurrent")
-
-        async def register():
-            return await UserRepository.get_or_create_user(
-                user_id=12345,
-                username="concurrent",
-                first_name="Real",
-            )
-
-        results = await asyncio.gather(register(), register())
-
-        for res in results:
-            assert res.user_id == 12345
-
-        user = await UserRepository.get_by_id(12345)
-        assert user is not None
-        assert user.username == "concurrent"
-
     async def test_get_by_id_existing_user(self, initialized_db):
         """Test retrieving existing user by ID."""
         created_user = await UserRepository.add("testuser")

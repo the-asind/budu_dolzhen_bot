@@ -4,14 +4,13 @@ import asyncio
 import aiosqlite
 import tempfile
 import os
-from datetime import datetime, timedelta, timezone, date
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from aiogram import Bot
 
 from bot.scheduler.jobs import send_weekly_reports, check_confirmation_timeouts, send_payday_reminders
 from bot.scheduler.scheduler_manager import SchedulerManager
 from bot.core.notification_service import NotificationService
-from bot.config import get_settings
 
 
 @pytest_asyncio.fixture
@@ -392,7 +391,7 @@ class TestConfirmationTimeouts:
         call_args = mock_notif.send_message.call_args
         assert call_args[0][0] == 1
         assert "automatically rejected" in call_args[0][1]
-        assert "#100" in call_args[0][1]
+        assert "@bob" in call_args[0][1]
     
     @pytest.mark.asyncio
     @patch('bot.scheduler.jobs.get_settings')
@@ -584,7 +583,7 @@ class TestUserOptOut:
                 (1,)
             )
             row = await cursor.fetchone()
-            assert row is not None and row[0] == False
+            assert row is not None and not row[0]
     
     @pytest.mark.asyncio
     async def test_default_opt_in_behavior(self, test_db):

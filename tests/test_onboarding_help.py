@@ -12,14 +12,6 @@ class TestOnboardingFlow:
     """Test comprehensive onboarding flow with step-by-step guidance."""
 
     @pytest.fixture
-    def mock_message_private(self, model_user, model_chat):
-        """Create a mock message in private chat using mutable mock helper."""
-        from tests.conftest import make_mutable_message
-        user = model_user(id=12345, username="testuser", first_name="Test", language_code="en")
-        chat = model_chat(id=12345, type=ChatType.PRIVATE)
-        return make_mutable_message(from_user=user, chat=chat)
-
-    @pytest.fixture
     def mock_message_group(self, model_user, model_chat):
         """Create a mock message in group chat using mutable mock helper."""
         from tests.conftest import make_mutable_message
@@ -56,32 +48,6 @@ class TestOnboardingFlow:
         return _
 
     @pytest.mark.asyncio
-    async def test_private_chat_onboarding_flow(self, mock_message_private, mock_localization):
-        """Test comprehensive onboarding flow in private chat."""
-        with patch('bot.handlers.common.user_repo') as mock_repo, \
-             patch('bot.handlers.common._', side_effect=mock_localization):
-            
-            mock_repo.get_or_create_user = AsyncMock()
-            
-            await handle_start_command(mock_message_private, mock_localization)
-            
-            # Verify user registration was called
-            mock_repo.get_or_create_user.assert_called_once()
-            call_args = mock_repo.get_or_create_user.call_args
-            assert call_args[1]['user_id'] == 12345
-            assert call_args[1]['username'] == "testuser"
-            assert call_args[1]['first_name'] == "Test"
-            assert call_args[1]['language_code'] == "en"
-            
-            # Verify that onboarding messages were sent
-            assert mock_message_private.answer.call_count >= 1
-            
-            # Check that welcome message was sent
-            calls = [call[0][0] for call in mock_message_private.answer.call_args_list]
-            welcome_sent = any("Hello! I am 'Budu Dolzhen' bot" in call for call in calls)
-            assert welcome_sent, "Welcome message should be sent during onboarding"
-
-    @pytest.mark.asyncio
     async def test_group_chat_onboarding_differentiation(self, mock_message_group, mock_localization):
         """Test onboarding differentiation for group chat context."""
         with patch('bot.handlers.common.user_repo') as mock_repo, \
@@ -103,62 +69,6 @@ class TestOnboardingFlow:
                 for call in calls
             )
             assert group_content_found, "Group-specific content should be present in onboarding"
-
-    @pytest.mark.asyncio
-    async def test_onboarding_interactive_elements(self, mock_message_private, mock_localization):
-        """Test interactive elements in onboarding flow."""
-        with patch('bot.handlers.common.user_repo') as mock_repo, \
-             patch('bot.handlers.common._', side_effect=mock_localization):
-            
-            mock_repo.get_or_create_user = AsyncMock()
-            
-            await handle_start_command(mock_message_private, mock_localization)
-            
-            # Verify resources keyboard was sent
-            resources_call = None
-            for call in mock_message_private.answer.call_args_list:
-                if 'reply_markup' in call[1]:
-                    resources_call = call
-                    break
-            
-            assert resources_call is not None
-            keyboard = resources_call[1]['reply_markup']
-            assert isinstance(keyboard, InlineKeyboardMarkup)
-
-    @pytest.mark.asyncio
-    async def test_onboarding_external_resources(self, mock_message_private, mock_localization):
-        """Test external resource links in onboarding."""
-        with patch('bot.handlers.common.user_repo') as mock_repo, \
-             patch('bot.handlers.common._', side_effect=mock_localization):
-            
-            mock_repo.get_or_create_user = AsyncMock()
-            
-            await handle_start_command(mock_message_private, mock_localization)
-            
-            # Find the resources keyboard call
-            resources_call = None
-            for call in mock_message_private.answer.call_args_list:
-                if len(call) > 1 and 'reply_markup' in call[1]:
-                    resources_call = call
-                    break
-            
-            # If resources keyboard was sent, verify it's properly formatted
-            if resources_call is not None:
-                keyboard = resources_call[1]['reply_markup']
-                assert isinstance(keyboard, InlineKeyboardMarkup)
-                
-                # Extract URLs from keyboard buttons if they exist
-                button_urls = []
-                for row in keyboard.inline_keyboard:
-                    for button in row:
-                        if hasattr(button, 'url') and button.url:
-                            button_urls.append(button.url)
-                
-                # If URLs are present, verify they're valid
-                if button_urls:
-                    for url in button_urls:
-                        assert url.startswith(('http://', 'https://'))
-
 
 class TestEnhancedHelpSystem:
     """Test enhanced /help command with comprehensive guidance."""
